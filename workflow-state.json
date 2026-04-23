@@ -1,37 +1,67 @@
 {
   "_comment": "Workflow state machine — cập nhật sau mỗi step. KHÔNG sửa tay trừ khi cần reset.",
   "version": "1.0.0",
-  "project_name": "",
+  "project_name": "Auto Brainstorm Project",
   "project_description": "",
-  "created_at": "",
-  "updated_at": "",
-
-  "current_step": 0,
-  "overall_status": "not_started",
-
+  "created_at": "2026-04-23 13:37:56",
+  "updated_at": "2026-04-23 13:59:28",
+  "current_step": 2,
+  "overall_status": "in_progress",
   "steps": {
     "1": {
       "name": "Requirements Analysis",
       "agent": "pm",
-      "support_agents": ["tech-lead"],
-      "status": "pending",
-      "started_at": null,
-      "completed_at": null,
-      "approved_at": null,
-      "approved_by": null,
-      "approval_status": null,
+      "support_agents": [
+        "tech-lead"
+      ],
+      "status": "completed",
+      "started_at": "2026-04-23 13:38:18",
+      "completed_at": "2026-04-23 13:54:08",
+      "approved_at": "2026-04-23 13:54:08",
+      "approved_by": "P0 Lock Test",
+      "approval_status": "approved",
       "graphify_snapshot": null,
-      "deliverables": [],
-      "blockers": [],
-      "decisions": [],
+      "deliverables": [
+        "workflows/dispatch/step-1/reports/pm-report.md — Worker report",
+        "docs/requirements.md",
+        "workflows/dispatch/step-1/reports/tech-lead-report.md — Worker report",
+        "docs/architecture.md"
+      ],
+      "blockers": [
+        {
+          "id": "B20260423134931069380",
+          "description": "Need techlead estimate confidence threshold.",
+          "created_at": "2026-04-23 13:49:31",
+          "resolved": true,
+          "source": "workflows/dispatch/step-1/reports/pm-report.md",
+          "resolved_at": "2026-04-23 13:50:25"
+        }
+      ],
+      "decisions": [
+        {
+          "id": "D20260423134931068476",
+          "description": "Use PM as single communication gateway.",
+          "date": "2026-04-23",
+          "source": "workflows/dispatch/step-1/reports/pm-report.md"
+        },
+        {
+          "id": "D20260423134931070913",
+          "description": "Use delegate depth limit = 3.",
+          "date": "2026-04-23",
+          "source": "workflows/dispatch/step-1/reports/tech-lead-report.md"
+        }
+      ],
       "notes": ""
     },
     "2": {
       "name": "System Design",
       "agent": "tech-lead",
-      "support_agents": ["backend", "pm"],
-      "status": "pending",
-      "started_at": null,
+      "support_agents": [
+        "backend",
+        "pm"
+      ],
+      "status": "in_progress",
+      "started_at": "2026-04-23 13:59:28",
       "completed_at": null,
       "approved_at": null,
       "approved_by": null,
@@ -45,7 +75,10 @@
     "3": {
       "name": "UI/UX Design",
       "agent": "ui-ux",
-      "support_agents": ["frontend", "pm"],
+      "support_agents": [
+        "frontend",
+        "pm"
+      ],
       "status": "pending",
       "started_at": null,
       "completed_at": null,
@@ -61,7 +94,9 @@
     "4": {
       "name": "Backend Development",
       "agent": "backend",
-      "support_agents": ["tech-lead"],
+      "support_agents": [
+        "tech-lead"
+      ],
       "status": "pending",
       "started_at": null,
       "completed_at": null,
@@ -77,7 +112,10 @@
     "5": {
       "name": "Frontend Development",
       "agent": "frontend",
-      "support_agents": ["ui-ux", "tech-lead"],
+      "support_agents": [
+        "ui-ux",
+        "tech-lead"
+      ],
       "status": "pending",
       "started_at": null,
       "completed_at": null,
@@ -93,7 +131,10 @@
     "6": {
       "name": "Integration Testing",
       "agent": "tech-lead",
-      "support_agents": ["backend", "frontend"],
+      "support_agents": [
+        "backend",
+        "frontend"
+      ],
       "status": "pending",
       "started_at": null,
       "completed_at": null,
@@ -109,7 +150,11 @@
     "7": {
       "name": "QA Testing",
       "agent": "qa",
-      "support_agents": ["backend", "frontend", "devops"],
+      "support_agents": [
+        "backend",
+        "frontend",
+        "devops"
+      ],
       "status": "pending",
       "started_at": null,
       "completed_at": null,
@@ -125,7 +170,9 @@
     "8": {
       "name": "DevOps & Deployment",
       "agent": "devops",
-      "support_agents": ["tech-lead"],
+      "support_agents": [
+        "tech-lead"
+      ],
       "status": "pending",
       "started_at": null,
       "completed_at": null,
@@ -141,7 +188,11 @@
     "9": {
       "name": "Review & Release",
       "agent": "pm",
-      "support_agents": ["tech-lead", "qa", "devops"],
+      "support_agents": [
+        "tech-lead",
+        "qa",
+        "devops"
+      ],
       "status": "pending",
       "started_at": null,
       "completed_at": null,
@@ -155,21 +206,18 @@
       "notes": ""
     }
   },
-
   "graphify": {
     "last_indexed": null,
     "graph_path": ".graphify/graph.json",
     "snapshots": []
   },
-
   "gitnexus": {
     "last_analyzed": null,
     "total_changes_tracked": 0
   },
-
   "metrics": {
-    "total_blockers": 0,
-    "total_decisions": 0,
+    "total_blockers": 1,
+    "total_decisions": 2,
     "steps_completed": 0,
     "on_schedule": true
   }
