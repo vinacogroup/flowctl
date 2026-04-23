@@ -20,7 +20,7 @@
 #   dispatch [--launch|--headless] [--trust] [--dry-run] [--force-run] [--max-retries N] [--role name] [--budget-override-reason text]
 #                            Tạo briefs; launch UI hoặc chạy headless nền
 #   collect                  Gom worker reports vào workflow-state
-#   team <start|delegate|sync|status|monitor|recover|run>
+#   team <start|delegate|sync|status|monitor|recover|budget-reset|run>
 #                            PM-only orchestration: step-based spawn/collect/summary
 #   brainstorm [topic]       One-shot: init (if needed) + step-based delegate
 #   summary                  In summary của step hiện tại
@@ -426,7 +426,7 @@ case "$CMD" in
     echo -e "  dispatch [--launch|--headless] [--trust] [--dry-run] [--force-run] [--max-retries N] [--role name] [--budget-override-reason text]"
     echo -e "                         Tạo worker briefs + chạy workers"
     echo -e "  collect                Gom worker reports vào workflow-state"
-    echo -e "  team <start|delegate|sync|status|monitor|recover|run>"
+    echo -e "  team <start|delegate|sync|status|monitor|recover|budget-reset|run>"
     echo -e "                         PM-only orchestration cho sub-agents"
     echo -e "  brainstorm [topic] [--project Name] [--sync] [--wait N] [--dry-run]"
     echo -e "                         One-shot auto init + delegate theo current step"

@@ -40,12 +40,13 @@ wf_budget_prelaunch_check() {
   local max_retries="$5"
   local dry_run="${6:-false}"
   local override_reason="${7:-}"
+  local correlation_id="${8:-}"
   WF_BUDGET_STATE_FILE="$BUDGET_STATE_FILE" \
   WF_BUDGET_EVENTS_FILE="$BUDGET_EVENTS_FILE" \
   WF_BUDGET_POLICY_FILE="$BUDGET_POLICY_FILE" \
   WF_STATE_FILE="$STATE_FILE" \
   WF_STEP="$step" WF_ROLE="$role" WF_WORKFLOW_ID="$workflow_id" WF_RUN_ID="$run_id" \
-  WF_MAX_RETRIES="$max_retries" WF_BUDGET_DRY_RUN="$dry_run" WF_OVERRIDE_REASON="$override_reason" python3 - <<'PY'
+  WF_MAX_RETRIES="$max_retries" WF_BUDGET_DRY_RUN="$dry_run" WF_OVERRIDE_REASON="$override_reason" WF_CORRELATION_ID="$correlation_id" python3 - <<'PY'
 import json
 import os
 from datetime import datetime, timezone
@@ -73,6 +74,7 @@ run_id = os.environ["WF_RUN_ID"]
 max_retries = int(os.environ.get("WF_MAX_RETRIES", "3"))
 dry_run = os.environ.get("WF_BUDGET_DRY_RUN", "false").lower() == "true"
 override_reason = (os.environ.get("WF_OVERRIDE_REASON", "") or "").strip()
+correlation_id = (os.environ.get("WF_CORRELATION_ID", "") or "").strip()
 now = now_iso()
 now_dt = parse_iso(now)
 
@@ -155,6 +157,7 @@ if breaker["state"] == "open" and opened_at_dt is not None and now_dt is not Non
             "workflow_id": workflow_id,
             "run_id": run_id,
             "step": step,
+            "correlation_id": correlation_id,
         })
 
 if breaker["state"] == "open":
@@ -176,6 +179,7 @@ if breaker["state"] == "open":
             "role": role,
             "reason": override_reason,
             "from_breaker": "open",
+            "correlation_id": correlation_id,
         })
     elif override_reason and override_used:
         print("BLOCK|budget_override_already_used")
@@ -214,6 +218,7 @@ if breaker["state"] == "half-open":
             "run_id": run_id,
             "step": step,
             "role": role,
+            "correlation_id": correlation_id,
         })
 
 consumed_tokens = int(run.get("consumed_tokens_est", 0))
@@ -261,6 +266,7 @@ if breaches and override_reason and not override_used:
         "role": role,
         "reason": override_reason,
         "breaches": breaches,
+        "correlation_id": correlation_id,
     })
     run["override_used"] = True
     run["override_reason"] = override_reason
@@ -285,6 +291,7 @@ if breaches:
         "step": step,
         "role": role,
         "breaches": breaches,
+        "correlation_id": correlation_id,
     })
     if not dry_run:
         if workflow_state_path.exists():
@@ -327,6 +334,8 @@ role_row["cost_usd"] = round(role_projected_cost, 6)
 role_row["attempt_count"] = role_projected_attempts
 role_row["status"] = "reserved"
 role_row["updated_at"] = now
+role_row["correlation_id"] = correlation_id
+run["last_correlation_id"] = correlation_id
 
 for t in thresholds:
     try:
@@ -349,6 +358,7 @@ for t in thresholds:
             "run_id": run_id,
             "step": step,
             "role": role,
+            "correlation_id": correlation_id,
         })
 
 state_path.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -413,5 +423,51 @@ if breaker.get("state") == "half-open" and breaker.get("probe_role") == role:
     with events_path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(ev, ensure_ascii=False) + "\n")
 path.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
+PY
+}
+
+wf_budget_manual_reset() {
+  local reason="${1:-manual reset}"
+  WF_BUDGET_STATE_FILE="$BUDGET_STATE_FILE" \
+  WF_BUDGET_EVENTS_FILE="$BUDGET_EVENTS_FILE" \
+  WF_REASON="$reason" python3 - <<'PY'
+import json
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+
+def now_iso():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+state_path = Path(os.environ["WF_BUDGET_STATE_FILE"])
+events_path = Path(os.environ["WF_BUDGET_EVENTS_FILE"])
+reason = os.environ.get("WF_REASON", "manual reset")
+if not state_path.exists():
+    print("BUDGET_RESET|state_missing")
+    raise SystemExit(0)
+
+state = json.loads(state_path.read_text(encoding="utf-8"))
+run = state.get("run", {})
+breaker = state.setdefault("breaker", {})
+breaker["state"] = "closed"
+breaker["reason"] = reason
+breaker["opened_at"] = ""
+breaker["probe_role"] = ""
+breaker["last_transition_at"] = now_iso()
+state_path.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
+
+events_path.parent.mkdir(parents=True, exist_ok=True)
+with events_path.open("a", encoding="utf-8") as f:
+    f.write(json.dumps({
+        "timestamp": now_iso(),
+        "type": "breaker_transition",
+        "to_state": "closed",
+        "reason": reason,
+        "workflow_id": run.get("workflow_id", ""),
+        "run_id": run.get("run_id", ""),
+        "step": run.get("step", 0),
+    }, ensure_ascii=False) + "\n")
+
+print("BUDGET_RESET|breaker=closed")
 PY
 }

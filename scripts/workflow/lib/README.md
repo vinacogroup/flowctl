@@ -19,11 +19,11 @@ This folder contains modular building blocks for the workflow engine.
 - `gate.sh`
   - Gate evaluation and gate report audit trail.
 - `budget.sh`
-  - Budget guardrails (`token/time/cost`) with soft alerts and circuit-breaker transitions (`closed/half-open/open`), plus budget audit events.
+  - Budget guardrails (`token/time/cost`) with soft alerts and circuit-breaker transitions (`closed/half-open/open`), correlation-ID budget metering, manual breaker reset, and budget audit events.
 - `dispatch.sh`
   - Worker dispatch/collect, role session persistence (`role-sessions.json`), stream-json heartbeat capture (`heartbeats.jsonl`), correlation IDs (`workflowId/runId/step/role`), retry budget metadata, role-targeted dispatch (`--role`), role policy enforcement (`role-policy.v1.json`), and idempotency handling for role-step execution.
 - `orchestration.sh`
-  - Team-level orchestration commands (`team`, `brainstorm`) including runtime monitor policy classification (`transient`/`permanent`/`policy`), budget heartbeat (`% used`, `eta_to_cap`, breaker state), and recovery action routing (`recover`).
+  - Team-level orchestration commands (`team`, `brainstorm`) including runtime monitor policy classification (`transient`/`permanent`/`policy`), budget heartbeat (`% used`, `eta_to_cap`, breaker state), and recovery action routing (`recover`, `budget-reset`).
 - `reporting.sh`
   - Read/report/reset commands (`summary`, `history`, `release-dashboard`, `reset`).
 

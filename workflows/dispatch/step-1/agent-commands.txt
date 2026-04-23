@@ -1,2 +1,1 @@
-pm|agent --workspace "/Users/nvt/Documents/Workspace/Vinaco/brainstormings" "Bạn là @pm. Đọc brief tại workflows/dispatch/step-1/pm-brief.md và thực hiện đúng yêu cầu."
-tech-lead|agent --workspace "/Users/nvt/Documents/Workspace/Vinaco/brainstormings" "Bạn là @tech-lead. Đọc brief tại workflows/dispatch/step-1/tech-lead-brief.md và thực hiện đúng yêu cầu."
+pm|agent --workspace "/Users/nvt/Documents/Workspace/Vinaco/brainstormings" --resume "88801b4f-753a-43a4-addf-b8d39d26804c" "Bạn là @pm. Đọc brief tại workflows/dispatch/step-1/pm-brief.md và thực hiện đúng yêu cầu."

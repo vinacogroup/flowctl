@@ -358,6 +358,27 @@ PY
       [[ "$dry_run" == "true" ]] && dispatch_args+=(--dry-run)
       cmd_dispatch "${dispatch_args[@]}"
       ;;
+    budget-reset)
+      local reason="manual reset by PM"
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --reason)
+            reason="${2:-manual reset by PM}"
+            shift 2
+            ;;
+          *)
+            echo -e "${RED}Unknown option for team budget-reset: $1${NC}"
+            echo -e "Usage: bash scripts/workflow.sh team budget-reset [--reason \"text\"]\n"
+            exit 1
+            ;;
+        esac
+      done
+      echo -e "\n${BLUE}${BOLD}[TEAM] PM budget reset${NC}"
+      wf_budget_init_artifacts
+      local reset_result
+      reset_result=$(wf_budget_manual_reset "$reason")
+      echo -e "${GREEN}${reset_result}${NC}\n"
+      ;;
     run)
       echo -e "\n${BLUE}${BOLD}[TEAM] PM run loop (single cycle)${NC}"
       echo -e "Current step: ${BOLD}$step — $step_name${NC}"
@@ -372,7 +393,7 @@ PY
       ;;
     *)
       echo -e "${RED}Unknown team action: $action${NC}"
-      echo -e "Usage: bash scripts/workflow.sh team <start|delegate|sync|status|monitor|recover|run>\n"
+      echo -e "Usage: bash scripts/workflow.sh team <start|delegate|sync|status|monitor|recover|budget-reset|run>\n"
       exit 1
       ;;
   esac

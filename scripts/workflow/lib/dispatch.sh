@@ -330,7 +330,7 @@ PY
         continue
       fi
       local budget_decision
-      budget_decision=$(wf_budget_prelaunch_check "$step" "$role" "$workflow_id" "$run_id" "$max_retries" "$dry_run" "$budget_override_reason")
+      budget_decision=$(wf_budget_prelaunch_check "$step" "$role" "$workflow_id" "$run_id" "$max_retries" "$dry_run" "$budget_override_reason" "$correlation_id")
       if [[ "${budget_decision%%|*}" == "BLOCK" ]]; then
         echo -e "${RED}[budget] block @${role}:${NC} ${budget_decision#BLOCK|}"
         skipped=$((skipped + 1))
@@ -398,8 +398,9 @@ PY
       local launched=0
       while IFS='|' read -r role cmd; do
         [[ -z "$role" || -z "$cmd" ]] && continue
+        local correlation_id="${workflow_id}/${run_id}/${step}/${role}"
         local budget_decision
-        budget_decision=$(wf_budget_prelaunch_check "$step" "$role" "$workflow_id" "$run_id" "$max_retries" "$dry_run" "$budget_override_reason")
+        budget_decision=$(wf_budget_prelaunch_check "$step" "$role" "$workflow_id" "$run_id" "$max_retries" "$dry_run" "$budget_override_reason" "$correlation_id")
         if [[ "${budget_decision%%|*}" == "BLOCK" ]]; then
           echo -e "${RED}[budget] block @${role}:${NC} ${budget_decision#BLOCK|}"
           continue
@@ -426,8 +427,9 @@ PY
   else
     while IFS='|' read -r role _cmd; do
       [[ -z "$role" ]] && continue
+      local correlation_id="${workflow_id}/${run_id}/${step}/${role}"
       local budget_decision
-      budget_decision=$(wf_budget_prelaunch_check "$step" "$role" "$workflow_id" "$run_id" "$max_retries" "true" "")
+      budget_decision=$(wf_budget_prelaunch_check "$step" "$role" "$workflow_id" "$run_id" "$max_retries" "true" "" "$correlation_id")
       if [[ "${budget_decision%%|*}" == "BLOCK" ]]; then
         echo -e "${RED}[budget] block @${role}:${NC} ${budget_decision#BLOCK|}"
       else

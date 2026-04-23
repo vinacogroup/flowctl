@@ -289,6 +289,19 @@ assert_contains "$budget_block_output" "[budget] block @pm" "budget breaker shou
 
 budget_override_output="$(bash "$WORKFLOW" dispatch --headless --dry-run --force-run --role pm --budget-override-reason 'pm emergency' 2>&1 || true)"
 assert_contains "$budget_override_output" "[budget] allow @pm" "budget override reason should allow one-time exception"
+python3 - <<PY
+import json
+from pathlib import Path
+p=Path("$BUDGET_STATE_FILE")
+d=json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+d.setdefault("breaker", {})
+d["breaker"]["state"]="open"
+d["breaker"]["reason"]="test-open"
+d["breaker"]["opened_at"]="2026-04-23T00:00:00Z"
+p.write_text(json.dumps(d, indent=2, ensure_ascii=False), encoding="utf-8")
+PY
+budget_reset_output="$(bash "$WORKFLOW" team budget-reset --reason "regression reset" 2>&1 || true)"
+assert_contains "$budget_reset_output" "BUDGET_RESET|breaker=closed" "team budget-reset should close breaker"
 
 expect_failure "Approve must fail when --by value missing" bash "$WORKFLOW" approve --by
 

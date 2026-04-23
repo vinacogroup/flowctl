@@ -13,9 +13,9 @@ Build a step-based agent orchestration flow where:
 
 ## Progress Snapshot
 
-- Current maturity score: **9.4/10**
+- Current maturity score: **10/10**
 - Target maturity score: **10/10**
-- Current phase: **P2 governance hardening (completed)**
+- Current phase: **Release-ready (DoD validated)**
 
 ## Checklist
 
@@ -95,22 +95,24 @@ Build a step-based agent orchestration flow where:
   - `bash scripts/test-workflow-tdd-regression.sh`
 - Run chaos reliability suite for orchestration failure modes:
   - `bash scripts/test-workflow-chaos.sh`
+- Manual breaker recovery path:
+  - `bash scripts/workflow.sh team budget-reset --reason "manual recovery"`
 - Update role policy guardrails:
   - `workflows/policies/role-policy.v1.json`
 
 ## Definition of Done for 10/10
 
-- [ ] No false approvals (all approvals backed by gate + evidence)
-- [ ] Idempotent retries for all role-step executions
-- [ ] Deterministic resume behavior for persistent role sessions
-- [ ] Observable runtime with actionable alerts for stalls/failures
-- [ ] Security guardrails for trust and tool permissions
-- [ ] Automated regression + chaos checks integrated in release flow
+- [x] No false approvals (all approvals backed by gate + evidence)
+- [x] Idempotent retries for all role-step executions
+- [x] Deterministic resume behavior for persistent role sessions
+- [x] Observable runtime with actionable alerts for stalls/failures
+- [x] Security guardrails for trust and tool permissions
+- [x] Automated regression + chaos checks integrated in release flow
 
 ## Next Action (Immediate)
 
-- [ ] Add budget policy artifact `workflows/policies/budget-policy.v1.json` with per-run and per-role caps
-- [ ] Add budget meter module in `scripts/workflow/lib/*` to track token/time/cost spend by correlation ID
-- [ ] Add circuit breaker state transitions (`open`/`half-open`/`closed`) with cooldown + manual reset path
-- [ ] Add `team monitor` budget view for PM heartbeat (`% used`, `eta to cap`, `breaker state`)
-- [ ] Add regression tests for budget cutoff, exception audit, and breaker recovery behavior
+- [x] Add budget policy artifact `workflows/policies/budget-policy.v1.json` with per-run and per-role caps
+- [x] Add budget meter module in `scripts/workflow/lib/*` to track token/time/cost spend by correlation ID
+- [x] Add circuit breaker state transitions (`open`/`half-open`/`closed`) with cooldown + manual reset path
+- [x] Add `team monitor` budget view for PM heartbeat (`% used`, `eta to cap`, `breaker state`)
+- [x] Add regression tests for budget cutoff, exception audit, and breaker recovery behavior
