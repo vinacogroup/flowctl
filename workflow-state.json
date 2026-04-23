@@ -4,7 +4,7 @@
   "project_name": "Auto Brainstorm Project",
   "project_description": "",
   "created_at": "2026-04-23 13:37:56",
-  "updated_at": "2026-04-23 13:59:28",
+  "updated_at": "2026-04-23 22:30:34",
   "current_step": 2,
   "overall_status": "in_progress",
   "steps": {
@@ -67,9 +67,48 @@
       "approved_by": null,
       "approval_status": null,
       "graphify_snapshot": null,
-      "deliverables": [],
-      "blockers": [],
-      "decisions": [],
+      "deliverables": [
+        "workflows/dispatch/step-2/reports/backend-report.md — Worker report",
+        "workflows/dispatch/step-2/reports/pm-report.md — Worker report",
+        "workflows/dispatch/step-2/reports/tech-lead-report.md — Worker report",
+        "workflows/dispatch/step-2/tech-lead-system-design.md"
+      ],
+      "blockers": [
+        {
+          "id": "B20260423223034672115",
+          "description": "Thieu `docs/requirements.md` va `docs/architecture.md` (da tham chieu trong Step 1 deliverables), gay dut requirement-to-design traceability cho phe duyet Step 2.",
+          "created_at": "2026-04-23 22:30:34",
+          "resolved": false,
+          "source": "workflows/dispatch/step-2/reports/tech-lead-report.md"
+        },
+        {
+          "id": "B20260423223034672518",
+          "description": "`workflows/policies/role-policy.v1.json` chua bao phu day du role thuc thi (backend/frontend), can bo sung truoc khi delegate dai tra o Step 4/5.",
+          "created_at": "2026-04-23 22:30:34",
+          "resolved": false,
+          "source": "workflows/dispatch/step-2/reports/tech-lead-report.md"
+        }
+      ],
+      "decisions": [
+        {
+          "id": "D20260423223034670792",
+          "description": "Chon mo hinh orchestration qua CLI command contracts (khong mo REST API o Step 2), lay `workflow-state.json` lam state of truth, va enforce contract worker output gom SUMMARY/DELIVERABLE/DECISION/BLOCKER/NEXT.",
+          "date": "2026-04-23",
+          "source": "workflows/dispatch/step-2/reports/tech-lead-report.md"
+        },
+        {
+          "id": "D20260423223034671302",
+          "description": "Step 4 backend va Step 5 frontend chi duoc bat dau khi API/schema-contract va NFR targets trong system design duoc xem la locked artifacts, tranh scope drift va giam rui ro integration.",
+          "date": "2026-04-23",
+          "source": "workflows/dispatch/step-2/reports/tech-lead-report.md"
+        },
+        {
+          "id": "D20260423223034671713",
+          "description": "Giu co che gate fail-closed; moi truong hop bypass gate phai explicit actor + reason de dam bao auditability.",
+          "date": "2026-04-23",
+          "source": "workflows/dispatch/step-2/reports/tech-lead-report.md"
+        }
+      ],
       "notes": ""
     },
     "3": {
@@ -216,9 +255,10 @@
     "total_changes_tracked": 0
   },
   "metrics": {
-    "total_blockers": 1,
-    "total_decisions": 2,
+    "total_blockers": 3,
+    "total_decisions": 5,
     "steps_completed": 0,
     "on_schedule": true
-  }
+  },
+  "workflow_id": "wf-2d2955dc-ac35-4418-984c-a38e37d7ead8"
 }

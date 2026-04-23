@@ -1,1 +1,0 @@
-pm|agent --workspace "/Users/nvt/Documents/Workspace/Vinaco/brainstormings" --resume "88801b4f-753a-43a4-addf-b8d39d26804c" "Bạn là @pm. Đọc brief tại workflows/dispatch/step-1/pm-brief.md và thực hiện đúng yêu cầu."
