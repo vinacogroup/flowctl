@@ -1,211 +1,434 @@
-# Quy Tắc Toàn Cục - IT Product Team Workflow
-# Global Rules for All Agents
+# Quy Tắc Toàn Cục - Global Rules
+# Áp dụng cho: Tất cả agents | Version: 2.0.0 | Cập nhật: 2026-04-23
 
-## 1. NGUYÊN TẮC CỐT LÕI (Core Principles)
+## 1. Nguyên Tắc Cơ Bản
 
-### 1.1 Tính Nhất Quán (Consistency)
-- Tất cả agents phải tuân thủ cùng một bộ quy tắc
-- Định dạng tài liệu phải nhất quán trên toàn bộ workflow
-- Ngôn ngữ kỹ thuật: English; Tài liệu và giao tiếp: Vietnamese
+### 1.1 Tôn Trọng Quy Trình
+Mọi agent đều PHẢI tuân thủ quy trình 9 bước. Không có agent nào được:
+- Bỏ qua bất kỳ bước nào trong workflow
+- Bắt đầu bước tiếp theo mà không có human approval rõ ràng
+- Tự ý thay đổi scope mà không có PM approval
+- Commit trực tiếp vào nhánh `main` hoặc `master`
 
-### 1.2 Tính Minh Bạch (Transparency)
-- Mọi quyết định phải được ghi lại với lý do rõ ràng
-- Tất cả thay đổi phải có audit trail trong Graphify
-- Báo cáo tiến độ phải được cập nhật hàng ngày
+### 1.2 Transparency & Documentation
+- **Mọi quyết định phải được documented**: Không có quyết định quan trọng nào được đưa ra mà không ghi lại
+- **Mọi thay đổi phải có lý do**: Khi thay đổi approach hoặc scope, phải ghi lại nguyên nhân
+- **Mọi risk phải được escalate ngay**: Nếu phát hiện risk, phải report cho relevant agents trong vòng 2 giờ
 
-### 1.3 Tính Trách Nhiệm (Accountability)
-- Mỗi agent chịu trách nhiệm về deliverable của mình
-- Không được đổ lỗi sang agent khác khi có vấn đề
-- Lỗi phải được báo cáo ngay khi phát hiện
+### 1.3 Communication Standards
+- Sử dụng structured markdown cho tất cả communications
+- Tag agents khi cần input: `@pm`, `@tech-lead`, `@backend`, `@frontend`, `@ui-ux`, `@devops`, `@qa`
+- Sử dụng tiếng Việt cho documentation, English cho code và technical terms
+- Cấu trúc tin nhắn chuẩn:
+  ```
+  [AGENT_NAME] → [TARGET_AGENT/ALL]
+  Ưu tiên: [CRITICAL/HIGH/MEDIUM/LOW]
+  Chủ đề: [Subject]
+  Nội dung: [Content]
+  Hành động yêu cầu: [Required Action / None]
+  Deadline: [Date or N/A]
+  ```
 
-## 2. QUY TRÌNH GIAO TIẾP (Communication Protocol)
+### 1.4 Cấp Độ Ưu Tiên
+| Level | Thời Gian Phản Hồi | Ví Dụ |
+|-------|-------------------|-------|
+| CRITICAL | < 1 giờ | Security incident, production down |
+| HIGH | < 8 giờ (same day) | Blocking bug, approval needed |
+| MEDIUM | < 2 ngày | Review request, non-blocking issue |
+| LOW | Theo sprint schedule | Minor improvements, docs updates |
 
-### 2.1 Cấu Trúc Tin Nhắn
+## 2. Quy Tắc Sử Dụng Graphify
+
+### 2.1 Khi Nào Phải Update Graphify
+- ✅ Khi định nghĩa requirement mới hoặc cập nhật requirement
+- ✅ Khi đưa ra architecture decision (ADR)
+- ✅ Khi implement component/service mới
+- ✅ Khi phát hiện dependency mới giữa components
+- ✅ Khi một workflow step hoàn thành
+- ✅ Khi bug được confirmed với root cause rõ ràng
+- ✅ Khi có risk mới được phát hiện
+- ❌ KHÔNG cần update với minor code changes hoặc typo fixes
+
+### 2.2 Node Naming Convention
 ```
-[AGENT_NAME] → [TARGET_AGENT/ALL]
-Chủ đề: [Subject]
-Ưu tiên: [CRITICAL/HIGH/MEDIUM/LOW]
-Nội dung: [Content]
-Hành động cần thiết: [Required Action / None]
-Deadline: [Date/Time or N/A]
-```
+# Services/Components
+service:{name}                  # e.g., service:user-api
+component:{name}                # e.g., component:UserCard
 
-### 2.2 Cấp Độ Ưu Tiên
-- **CRITICAL**: Blocker - cần xử lý ngay lập tức (< 1 giờ)
-- **HIGH**: Quan trọng - cần xử lý trong ngày (< 8 giờ)
-- **MEDIUM**: Bình thường - cần xử lý trong 2 ngày
-- **LOW**: Thấp - có thể xử lý theo lịch sprint
+# Requirements
+requirement:us-{number}         # e.g., requirement:us-001
+requirement:epic-{number}       # e.g., requirement:epic-01
 
-### 2.3 Đường Leo Thang (Escalation Path)
-```
-Agent → Tech Lead → PM → Stakeholder
-```
-- Mỗi cấp leo thang có SLA 4 giờ làm việc
-- Phải ghi lại lý do leo thang
-- Phải thông báo cho tất cả các bên liên quan
+# Design
+design:screen:{name}            # e.g., design:screen:login
+design:component:{name}         # e.g., design:component:Button
+design:token:{name}             # e.g., design:token:color-primary
 
-## 3. CHUẨN TÀI LIỆU (Documentation Standards)
+# Infrastructure
+infra:{resource-type}           # e.g., infra:database, infra:cluster
 
-### 3.1 Cấu Trúc Tài Liệu Bắt Buộc
-Mỗi tài liệu phải có:
-```markdown
-# [Tiêu đề]
-**Phiên bản**: X.Y.Z
-**Ngày tạo**: YYYY-MM-DD
-**Tác giả**: [Agent Name]
-**Trạng thái**: [Draft/Review/Approved/Archived]
-**Liên quan**: [Related documents]
-```
+# Quality & Testing
+test-case:tc-{number}           # e.g., test-case:tc-001
+defect:bug-{number}             # e.g., defect:bug-042
 
-### 3.2 Versioning
-- Tài liệu quan trọng phải có version control
-- Version format: MAJOR.MINOR.PATCH
-- Breaking changes tăng MAJOR
-- Thêm mới tăng MINOR
-- Sửa lỗi tăng PATCH
+# Architecture Decisions
+adr:{number}                    # e.g., adr:001
 
-### 3.3 Review Cycle
-- Draft → Peer Review (24h) → Tech Review (24h) → Approval
-- Mọi comment phải được phản hồi
-- Resolved comments phải được đánh dấu
-
-## 4. CHUẨN CODE (Code Standards)
-
-### 4.1 Quy Tắc Chung
-- Sử dụng linter và formatter được cấu hình trong project
-- Code phải pass CI/CD pipeline trước khi merge
-- Không commit code có TODO/FIXME mà không có ticket
-
-### 4.2 Naming Conventions
-```
-Files: kebab-case (my-component.tsx)
-Classes: PascalCase (UserService)
-Functions/Variables: camelCase (getUserById)
-Constants: UPPER_SNAKE_CASE (MAX_RETRY_COUNT)
-Database tables: snake_case (user_profiles)
+# Workflow Progress
+step:{step-name}                # e.g., step:requirements-analysis
 ```
 
-### 4.3 Code Review Requirements
-- Tối thiểu 2 reviewers cho mọi PR
-- Tech Lead phải review PR liên quan đến architecture
-- Security-sensitive code phải được flagged và review kỹ
-- Performance-critical code phải có benchmark
+### 2.3 Relationship Types (Chuẩn Hóa)
+```
+# Architecture relationships
+--relation "calls"              # Service A gọi Service B
+--relation "depends-on"         # A phụ thuộc vào B
+--relation "persists-to"        # Service lưu data vào database
+--relation "reads-from"         # Service đọc từ database/cache
+--relation "integrates-with"    # Tích hợp với external system
 
-### 4.4 Testing Requirements
-- Unit tests: Tối thiểu 80% coverage
-- Integration tests: Tất cả API endpoints
-- E2E tests: Happy path và critical user journeys
-- Performance tests: Load testing trước mỗi release
+# Requirements relationships
+--relation "implements"         # Component thực hiện requirement
+--relation "decomposed-to"      # Epic phân rã thành user stories
+--relation "requested-by"       # Requirement được yêu cầu bởi stakeholder
+--relation "blocked-by"         # US bị chặn bởi US khác
 
-## 5. QUẢN LÝ RỦI RO (Risk Management)
+# Testing relationships
+--relation "validates"          # Test xác nhận requirement
+--relation "covers"             # Test bao phủ component/function
+--relation "reported-by"        # Bug được báo cáo bởi test case
 
-### 5.1 Phân Loại Rủi Ro
-| Mức Độ | Khả Năng Xảy Ra | Tác Động | Hành Động |
-|--------|-----------------|----------|-----------|
-| Critical | Cao | Cao | Xử lý ngay, leo thang PM |
-| High | Cao | Trung bình | Xử lý trong ngày |
-| Medium | Trung bình | Trung bình | Xử lý trong sprint |
-| Low | Thấp | Thấp | Ghi nhận, theo dõi |
+# Design relationships
+--relation "designed-as"        # Requirement được thiết kế thành screen
+--relation "uses"               # Screen sử dụng component
+```
 
-### 5.2 Quy Trình Xử Lý Rủi Ro
-1. Phát hiện rủi ro → Ghi vào Graphify risk register
+### 2.4 Graphify Query Patterns Chuẩn
+```bash
+# Load context trước khi bắt đầu step
+graphify query "{domain}:*" --filter "status=active"
+graphify query "{domain}:{entity}" --depth 2  # Load related nodes
+
+# Cập nhật trạng thái
+graphify update "{node-id}" --status "{status}" --updated-at "{date}"
+
+# Tạo relationship
+graphify link "{source-id}" "{target-id}" --relation "{type}"
+
+# Snapshot sau khi hoàn thành step
+graphify snapshot "{step-name}-{date}"
+```
+
+## 3. Quy Tắc Sử Dụng GitNexus
+
+### 3.1 Branch Strategy (Gitflow)
+```
+main            # Production - always deployable, protected
+develop         # Integration branch - base cho tất cả feature branches
+feature/*       # New features
+fix/*           # Bug fixes
+release/*       # Release preparation
+hotfix/*        # Urgent production fixes
+docs/*          # Documentation only
+infra/*         # Infrastructure và DevOps changes
+test/*          # Test code additions
+chore/*         # Non-functional changes (deps, configs)
+```
+
+### 3.2 Conventional Commit Format
+```
+{type}({scope}): {description}
+
+[optional body]
+
+[optional footer: Breaking change, closes issue]
+```
+
+**Types chuẩn hóa:**
+| Type | Mô Tả | Ví Dụ |
+|------|--------|-------|
+| `feat` | Tính năng mới | `feat(api): add user profile endpoint` |
+| `fix` | Bug fix | `fix(auth): resolve token refresh race condition` |
+| `docs` | Documentation | `docs(readme): update setup guide` |
+| `style` | Formatting | `style(ui): fix button alignment` |
+| `refactor` | Code restructure | `refactor(service): extract validation logic` |
+| `test` | Tests | `test(api): add integration tests for auth` |
+| `chore` | Build/configs | `chore(deps): update dependencies` |
+| `perf` | Performance | `perf(db): optimize user query with index` |
+| `ci` | CI/CD | `ci(pipeline): add security scanning stage` |
+| `deploy` | Deployment | `deploy(prod): release v1.2.0` |
+| `revert` | Revert commit | `revert: revert broken migration` |
+
+**Scopes hợp lệ:** `api`, `ui`, `db`, `auth`, `infra`, `docs`, `design`, tên module cụ thể
+
+### 3.3 PR Requirements
+Mọi PR phải có:
+- [ ] Title theo conventional commit format
+- [ ] Description: What (cái gì thay đổi), Why (tại sao), How (cách implement), Testing (đã test gì)
+- [ ] Linked issue/ticket
+- [ ] Screenshots/recordings cho UI changes
+- [ ] `gitnexus pr describe --auto` được chạy
+- [ ] Minimum 1 reviewer (Tech Lead cho backend/frontend)
+- [ ] All CI checks passing
+
+### 3.4 Merge Strategy
+| Source → Target | Strategy | Allowed By |
+|----------------|---------|-----------|
+| feature → develop | Squash merge | Tech Lead |
+| fix → develop | Squash merge | Tech Lead |
+| develop → release | Merge commit | Tech Lead |
+| release → main | Merge commit | Tech Lead + PM |
+| hotfix → main | Merge commit | Tech Lead + PM (emergency) |
+| hotfix → develop | Merge commit | Tech Lead |
+
+## 4. Code Quality Standards
+
+### 4.1 Mandatory Quality Gates (Tất Cả Code Phải Pass)
+```yaml
+Lint:
+  JavaScript/TypeScript: ESLint - 0 errors, 0 warnings
+  Python: Pylint - score >= 9.0 / 10.0
+  Go: golangci-lint - 0 issues
+  CSS/SCSS: Stylelint - 0 errors
+
+Type Checking:
+  TypeScript: strict mode, 0 errors
+  Python: mypy strict, 0 errors
+
+Test Coverage:
+  Lines: >= 80%
+  Branches: >= 75%
+  Functions: >= 85%
+
+Security:
+  SAST: No Critical, no High findings
+  Dependencies: No Critical CVEs (CVSS >= 9.0)
+  Secrets scan: 0 secrets detected
+
+Complexity:
+  Cyclomatic complexity: <= 10 per function
+  File length: <= 500 lines (exceptions need review)
+  Function length: <= 50 lines
+```
+
+### 4.2 Documentation Requirements
+```
+Public API/Function phải có:
+  - Purpose description (1-2 sentences)
+  - Parameters với types và descriptions
+  - Return value description
+  - Exceptions/errors thrown
+  - Usage example (cho complex functions)
+
+Module/File phải có:
+  - Module-level docstring/comment
+  - Responsibility description
+  - Author (agent role)
+```
+
+### 4.3 Naming Conventions
+```
+Files:          kebab-case          (user-profile.service.ts)
+Classes:        PascalCase          (UserProfileService)
+Functions:      camelCase           (getUserById)
+Variables:      camelCase           (currentUser)
+Constants:      UPPER_SNAKE_CASE    (MAX_RETRY_COUNT)
+DB Tables:      snake_case          (user_profiles)
+DB Columns:     snake_case          (created_at)
+CSS Classes:    kebab-case          (user-avatar)
+Environment:    UPPER_SNAKE_CASE    (DATABASE_URL)
+```
+
+### 4.4 Error Handling Standards
+```typescript
+// ✅ Đúng: Specific error types với meaningful messages
+throw new ValidationError(`Field 'email' is required, received: ${typeof value}`)
+throw new NotFoundError(`User with id '${id}' not found in database`)
+throw new ConflictError(`Username '${username}' is already taken`)
+
+// ❌ Sai: Generic errors
+throw new Error('Something went wrong')
+
+// ❌ Sai: Silent failure (swallow errors)
+try {
+  await doSomething()
+} catch (e) {
+  // nothing here
+}
+
+// ✅ Đúng: Log và re-throw hoặc handle gracefully
+try {
+  await doSomething()
+} catch (error) {
+  logger.error('Operation failed', { error, context })
+  throw new ServiceError('Operation failed', { cause: error })
+}
+```
+
+## 5. Security Standards
+
+### 5.1 Authentication & Authorization
+- Tất cả API endpoints phải có authentication (trừ public endpoints explicitly marked)
+- Authorization check ở service layer (không chỉ controller)
+- JWT: Access token <= 15 phút, Refresh token <= 7 ngày
+- Refresh tokens phải stored securely và revocable
+
+### 5.2 Input Validation Rules
+```
+RULE 1: Validate ALL user inputs tại boundary (controller/API layer)
+RULE 2: Sanitize ALL inputs trước database operations
+RULE 3: Validate AGAIN tại service layer cho business rules
+RULE 4: NEVER trust client-side validation alone
+RULE 5: Whitelist validation preferred over blacklist
+```
+
+### 5.3 Secrets Management
+```
+FORBIDDEN: Hardcoded passwords, API keys, connection strings trong code
+FORBIDDEN: Secrets trong source code, config files committed to git, logs
+FORBIDDEN: Secrets trong error messages hay debug output
+REQUIRED:  Tất cả secrets trong environment variables
+REQUIRED:  Production secrets trong secret manager (Vault/AWS SM/GCP SM)
+REQUIRED:  Khác nhau cho mỗi environment (dev, staging, prod)
+REQUIRED:  Secret rotation plan được document
+```
+
+### 5.4 Data Privacy
+- PII phải encrypted at rest (AES-256 minimum)
+- PII KHÔNG được log (mask trước khi log: email → `u***@example.com`)
+- Data retention policy phải implemented
+- GDPR compliance nếu serving EU users (right to deletion, data export)
+
+## 6. Performance Standards
+
+### 6.1 Backend API Targets
+| Percentile | Target | Action |
+|-----------|--------|--------|
+| p50 median | < 50ms | Monitor |
+| p95 | < 200ms | Investigate nếu exceeded |
+| p99 | < 500ms | Urgent fix required |
+| Max | < 1000ms | Critical alert, immediate action |
+
+### 6.2 Frontend Performance
+| Metric | Target | Tool |
+|--------|--------|------|
+| LCP (Largest Contentful Paint) | < 2.5s | Lighthouse |
+| FID/INP (Interaction to Next Paint) | < 100ms | Lighthouse |
+| CLS (Cumulative Layout Shift) | < 0.1 | Lighthouse |
+| TTFB (Time to First Byte) | < 600ms | Lighthouse |
+| Bundle JS/route | < 250KB gzipped | Bundle Analyzer |
+
+### 6.3 Database
+- Queries > 100ms phải được analyzed và optimized
+- N+1 queries KHÔNG được phép trong production code
+- Pagination required cho tất cả list endpoints (default: 20, max: 100)
+- Connection pooling required
+
+## 7. Approval Gate Rules
+
+### 7.1 Ai Có Thể Approve Từng Step
+| Step | Approvers Bắt Buộc |
+|------|-------------------|
+| 1 - Requirements | PM + ít nhất 1 Stakeholder |
+| 2 - System Design | Tech Lead + PM |
+| 3 - UI/UX Design | UI/UX Designer + PM |
+| 4 - Backend Dev | Tech Lead |
+| 5 - Frontend Dev | Tech Lead + UI/UX |
+| 6 - Integration | Tech Lead |
+| 7 - QA Testing | QA Lead + PM |
+| 8 - DevOps | DevOps + Tech Lead + PM |
+| 9 - Release | PM + Tech Lead + Stakeholder |
+
+### 7.2 Quy Trình Approval (Chuẩn)
+1. Agent hoàn thành step deliverables
+2. Agent tạo Step Summary (template: `workflows/templates/step-summary-template.md`)
+3. Agent tạo Review Checklist (template: `workflows/templates/review-checklist-template.md`)
+4. Agent tạo Approval Request (template: `workflows/templates/approval-request-template.md`)
+5. Approvers review tất cả documents (SLA: 24 giờ)
+6. Nếu có feedback: Agent address và resubmit
+7. Khi approved: Ghi lại approval với timestamp, approver names
+8. Update Graphify với step completion status
+9. Proceed to next step
+
+### 7.3 Blocking vs. Non-Blocking Issues
+**Blocking** (phải resolve trước khi approve):
+- Critical hoặc High severity bugs
+- Security vulnerabilities (Critical/High)
+- Performance SLA breaches
+- Missing Acceptance Criteria
+- Failed CI/CD checks
+
+**Non-Blocking** (có thể carry forward với PM approval):
+- Low/Medium bugs với known workaround
+- Minor UX improvements
+- Non-critical documentation gaps
+- Technical debt (tracked as backlog items)
+
+## 8. Risk Management
+
+### 8.1 Phân Loại Rủi Ro
+| Level | Probability | Impact | Action Required |
+|-------|------------|--------|----------------|
+| Critical | High | High | Xử lý ngay, escalate PM + Tech Lead |
+| High | High | Medium hoặc Medium/High | Xử lý trong ngày |
+| Medium | Medium | Medium | Xử lý trong sprint |
+| Low | Low | Low | Ghi nhận, theo dõi |
+
+### 8.2 Quy Trình Xử Lý Rủi Ro
+1. Phát hiện → Ghi vào Graphify risk register trong vòng 2 giờ
 2. Đánh giá mức độ → Xác định người chịu trách nhiệm
-3. Lập kế hoạch mitigate → Review với Tech Lead/PM
-4. Thực hiện mitigate → Cập nhật Graphify
-5. Verify resolved → Đóng ticket rủi ro
+3. Lập kế hoạch mitigation → Review với Tech Lead/PM
+4. Thực hiện mitigation → Cập nhật Graphify
+5. Verify resolved → Đóng risk item
 
-## 6. BẢO MẬT (Security)
+### 8.3 Security Incident Response
+1. **Immediately**: Classify severity, notify Tech Lead + PM
+2. **If Critical**: Stop all deployments, isolate affected systems
+3. Create hotfix branch (private nếu sensitive)
+4. Fix, verify, và emergency deploy nếu cần
+5. Post-mortem: Document lessons learned trong 48 giờ
 
-### 6.1 Quy Tắc Bảo Mật Cơ Bản
-- Không bao giờ commit secrets, passwords, API keys vào git
-- Sử dụng environment variables cho tất cả configuration nhạy cảm
-- Encrypt data at rest và in transit
-- Principle of least privilege cho tất cả permissions
+## 9. Escalation Protocol
 
-### 6.2 Security Review Triggers
-Bắt buộc security review khi:
-- Thêm mới authentication/authorization logic
-- Thay đổi data access patterns
-- Thêm external dependencies mới
-- Thay đổi infrastructure configuration
+### 9.1 Technical Disagreements
+1. Discuss trong PR comments (24 giờ)
+2. Escalate to Tech Lead nếu không resolve
+3. Tech Lead quyết định (binding decision)
+4. Document decision trong ADR
 
-### 6.3 Incident Response
-1. Phát hiện → Thông báo ngay cho Tech Lead và PM (CRITICAL)
-2. Containment → Isolate affected systems
-3. Investigation → Root cause analysis
-4. Remediation → Fix và verify
-5. Post-mortem → Ghi lại bài học
+### 9.2 Scope Disagreements
+1. Flag to PM immediately
+2. PM consults stakeholders (24-48 giờ)
+3. PM quyết định (binding cho scope)
+4. Tech Lead assess technical impact
+5. Update roadmap nếu cần
 
-## 7. HIỆU SUẤT (Performance)
+### 9.3 Quality Gate Fails
+1. QA Agent documents specific failures
+2. Assign bugs đến relevant dev agents
+3. Dev agents fix và re-deploy to staging
+4. QA re-tests (full regression nếu cần)
+5. Nếu deadline conflict: PM + Tech Lead decide trên risk acceptance
 
-### 7.1 SLO (Service Level Objectives)
-- API response time: P95 < 200ms, P99 < 500ms
-- Frontend load time: First Contentful Paint < 1.5s
-- Database query time: P95 < 100ms
-- Availability: 99.9% uptime
+## 10. Document Retention
 
-### 7.2 Performance Monitoring
-- Tất cả agents phải xem xét performance impact của changes
-- Performance regression cần ngăn chặn trước khi merge
-- Load testing bắt buộc cho features có high traffic
+| Loại Document | Lưu Trữ | Location |
+|--------------|---------|---------|
+| Step summaries | Vĩnh viễn | `docs/summaries/` |
+| Review records | Vĩnh viễn | `docs/reviews/` |
+| Approval records | Vĩnh viễn | `docs/approvals/` |
+| ADRs | Vĩnh viễn | `docs/adr/` |
+| Bug reports | Trong issue tracker | Jira/Linear |
+| Performance reports | 6 tháng | `docs/performance/` |
+| Security reports | Vĩnh viễn (confidential) | Secure storage |
 
-## 8. GRAPHIFY INTEGRATION RULES
+## 11. Liên Kết Tài Nguyên
 
-### 8.1 Khi Nào Cập Nhật Graphify
-- Khi bắt đầu một workflow step mới
-- Khi có quyết định kiến trúc quan trọng
-- Khi phát hiện dependency mới
-- Khi hoàn thành một deliverable
-- Khi step được approve
-
-### 8.2 Node Types Trong Graphify
-```
-Requirement → Feature → Task → Code → Test → Deployment
-Risk → Mitigation
-Decision → Rationale → Alternative
-Person → Role → Responsibility
-```
-
-## 9. GITNEXUS INTEGRATION RULES
-
-### 9.1 Branch Naming Strategy
-```
-feature/[ticket-id]-short-description
-bugfix/[ticket-id]-short-description
-hotfix/[ticket-id]-short-description
-release/v[version]
-```
-
-### 9.2 Commit Message Format (Conventional Commits)
-```
-type(scope): description [ticket-id]
-
-body (optional)
-
-footer (optional)
-```
-Types: feat, fix, docs, style, refactor, test, chore, perf
-
-### 9.3 PR Requirements
-- Title phải follow GitNexus format
-- Description phải có: What, Why, How, Testing, Screenshots
-- Tất cả CI checks phải pass
-- Tất cả review comments phải được resolved
-
-## 10. APPROVAL PROCESS
-
-### 10.1 Approval Levels
-- **Step Approval**: PM + Tech Lead
-- **Code Merge**: 2 developers + Tech Lead (cho critical code)
-- **Production Deploy**: PM + Tech Lead + DevOps
-- **Architecture Decision**: Tech Lead + PM + Senior Dev
-
-### 10.2 Approval Timeout
-- Nếu không có response sau 24h → Leo thang lên cấp trên
-- Nếu không có response sau 48h → Tự động leo thang lên PM
-- Emergency: Có thể dùng emergency approval với 1 approver + ghi lý do
-
-### 10.3 Rejection Handling
-- Rejection phải có lý do cụ thể
-- Người bị reject phải có 48h để address concerns
-- Re-review sau khi fix không cần full cycle (chỉ verify changes)
+- Workflow Steps: `workflows/steps/`
+- Agent Definitions: `.cursor/agents/`
+- Skills: `.cursor/skills/`
+- Templates: `workflows/templates/`
+- Graphify Integration: `.cursor/skills/graphify-integration.md`
+- GitNexus Integration: `.cursor/skills/gitnexus-integration.md`
+- Review & Approval Rules: `.cursor/rules/review-rules.md`
+- Workflow Rules: `.cursor/rules/workflow-rules.md`
