@@ -25,6 +25,7 @@ try:
     from rich.columns import Columns
     from rich.text import Text
     from rich.rule import Rule
+    from rich.layout import Layout
     from rich.console import Group as RGroup
     from rich import box
     USE_RICH = True
@@ -150,7 +151,7 @@ def hit_bar(rate, width=8):
 
 # ── Rich renderer ─────────────────────────────────────────────
 
-def render_rich():
+def render_rich(live_mode=False):
     stats  = load_stats()
     events = load_events(100)
     wf     = load_workflow_state()
@@ -306,11 +307,37 @@ def render_rich():
         style="dim",
     )
 
-    items = [header, stats_row, budget_txt, Columns([tool_table, act_table], expand=True)]
+    if not live_mode:
+        items = [header, stats_row, budget_txt, Columns([tool_table, act_table], expand=True)]
+        if help_panel:
+            items.append(help_panel)
+        items += [alert_panel, footer]
+        return RGroup(*items)
+
+    # Layout for Live(screen=True) — properly partitions terminal height
+    alert_height = len(alerts) + 3  # content lines + panel borders
+    layout = Layout()
+    layout.split_column(
+        Layout(name="header",  size=3),
+        Layout(name="stats",   size=5),
+        Layout(name="budget",  size=1),
+        Layout(name="main",    ratio=1),
+        Layout(name="alerts",  size=max(alert_height, 4)),
+        Layout(name="footer",  size=1),
+    )
+    layout["header"].update(header)
+    layout["stats"].update(stats_row)
+    layout["budget"].update(budget_txt)
     if help_panel:
-        items.append(help_panel)
-    items += [alert_panel, footer]
-    return RGroup(*items)
+        layout["main"].update(help_panel)
+    else:
+        layout["main"].split_row(
+            Layout(tool_table, name="tools"),
+            Layout(act_table,  name="activity"),
+        )
+    layout["alerts"].update(alert_panel)
+    layout["footer"].update(footer)
+    return layout
 
 # ── ANSI fallback renderer ────────────────────────────────────
 
@@ -387,12 +414,12 @@ def main():
     threading.Thread(target=_key_reader, daemon=True).start()
 
     if USE_RICH:
-        with Live(render_rich(), refresh_per_second=4, screen=True, console=Console()) as live:
+        with Live(render_rich(live_mode=True), refresh_per_second=4, screen=True, console=Console()) as live:
             while not _state["quit"]:
                 time.sleep(0.1)
                 if not _state["paused"] or _state["force_refresh"]:
                     _state["force_refresh"] = False
-                    live.update(render_rich())
+                    live.update(render_rich(live_mode=True))
     else:
         while not _state["quit"]:
             if not _state["paused"] or _state["force_refresh"]:
