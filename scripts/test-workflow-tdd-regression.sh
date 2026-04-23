@@ -113,6 +113,7 @@ log "PASS: normalized step 1 state after init"
 expect_success "Start step 1" bash "$WORKFLOW" start
 
 expect_failure "Approve must be blocked before reports/collect" bash "$WORKFLOW" approve --by "TDD"
+expect_failure "Policy should deny trust for restricted roles" bash "$WORKFLOW" dispatch --headless --trust --dry-run
 
 expect_success "Dispatch dry-run for step 1" bash "$WORKFLOW" team delegate --dry-run
 monitor_output="$(bash "$WORKFLOW" team monitor --stale-seconds 1)"
@@ -245,6 +246,7 @@ assert_contains "$step_after_reset" "1" "reset should set current_step back to 1
   echo "- gate fails on open blocker, passes after resolve"
   echo "- approve advances workflow step when gate passes"
   echo "- idempotency skip + force-run override behavior"
+  echo "- role policy denies restricted trust mode"
   echo "- team monitor reports runtime role statuses"
   echo "- correlation ID surfaced in monitor output"
   echo "- timeout/retry policy class surfaced in monitor output"

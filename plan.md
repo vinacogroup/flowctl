@@ -49,7 +49,7 @@ Build a step-based agent orchestration flow where:
 
 ### P2 — Production-Grade Governance
 
-- [ ] Add policy-as-code for trust/tool permission per role
+- [x] Add policy-as-code for trust/tool permission per role
 - [ ] Add budget guardrails (token/time caps + circuit breaker)
 - [ ] Add immutable evidence integrity checks (checksum/signature)
 - [ ] Add full traceability map:
@@ -84,6 +84,8 @@ Build a step-based agent orchestration flow where:
   - `bash scripts/workflow.sh approve --skip-gate --by "Your Name"`
 - Run TDD regression suite before major refactor:
   - `bash scripts/test-workflow-tdd-regression.sh`
+- Update role policy guardrails:
+  - `workflows/policies/role-policy.v1.json`
 
 ## Definition of Done for 10/10
 

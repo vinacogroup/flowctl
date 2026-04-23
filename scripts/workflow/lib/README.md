@@ -5,7 +5,7 @@ This folder contains modular building blocks for the workflow engine.
 ## Module Boundaries
 
 - `config.sh`
-  - Centralized paths and runtime constants (`STATE_FILE`, `QA_GATE_FILE`, lock/idempotency files).
+  - Centralized paths and runtime constants (`STATE_FILE`, `QA_GATE_FILE`, lock/idempotency files, `ROLE_POLICY_FILE`).
 - `common.sh`
   - Shared shell helpers and output formatting (`wf_now`, `wf_today`, `wf_ensure_dir`, colors).
 - `state.sh`
@@ -15,7 +15,7 @@ This folder contains modular building blocks for the workflow engine.
 - `gate.sh`
   - Gate evaluation and gate report audit trail.
 - `dispatch.sh`
-  - Worker dispatch/collect, role session persistence (`role-sessions.json`), stream-json heartbeat capture (`heartbeats.jsonl`), correlation IDs (`workflowId/runId/step/role`), retry budget metadata, role-targeted dispatch (`--role`), and idempotency handling for role-step execution.
+  - Worker dispatch/collect, role session persistence (`role-sessions.json`), stream-json heartbeat capture (`heartbeats.jsonl`), correlation IDs (`workflowId/runId/step/role`), retry budget metadata, role-targeted dispatch (`--role`), role policy enforcement (`role-policy.v1.json`), and idempotency handling for role-step execution.
 - `orchestration.sh`
   - Team-level orchestration commands (`team`, `brainstorm`) including runtime monitor policy classification (`transient`/`permanent`/`policy`) and recovery action routing (`recover`).
 - `reporting.sh`

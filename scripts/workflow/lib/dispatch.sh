@@ -55,6 +55,9 @@ PY
 )
   local run_id
   run_id="run-$(date -u '+%Y%m%dT%H%M%SZ')-$RANDOM"
+  local dispatch_mode="manual"
+  [[ "$headless" == "true" ]] && dispatch_mode="headless"
+  [[ "$auto_launch" == "true" ]] && dispatch_mode="launch"
 
   local dispatch_dir="$REPO_ROOT/workflows/dispatch/step-$step"
   local reports_dir="$dispatch_dir/reports"
@@ -66,9 +69,10 @@ PY
   [[ -f "$ROLE_SESSIONS_FILE" ]] || echo '{}' > "$ROLE_SESSIONS_FILE"
   [[ -f "$HEARTBEATS_FILE" ]] || : > "$HEARTBEATS_FILE"
 
-  WF_STEP="$step" WF_STATE="$STATE_FILE" WF_REPO="$REPO_ROOT" WF_DISPATCH="$dispatch_dir" WF_REPORTS="$reports_dir" python3 - <<'PY'
+  WF_STEP="$step" WF_STATE="$STATE_FILE" WF_REPO="$REPO_ROOT" WF_DISPATCH="$dispatch_dir" WF_REPORTS="$reports_dir" WF_POLICY_FILE="$ROLE_POLICY_FILE" WF_TRUST_REQUESTED="$trust_workspace" WF_DISPATCH_MODE="$dispatch_mode" python3 - <<'PY'
 import json
 import os
+import sys
 from pathlib import Path
 
 state_path = Path(os.environ["WF_STATE"])
@@ -76,6 +80,9 @@ repo_root = Path(os.environ["WF_REPO"])
 step = str(os.environ["WF_STEP"])
 dispatch_dir = Path(os.environ["WF_DISPATCH"])
 reports_dir = Path(os.environ["WF_REPORTS"])
+policy_path = Path(os.environ["WF_POLICY_FILE"])
+trust_requested = os.environ.get("WF_TRUST_REQUESTED", "false").lower() == "true"
+dispatch_mode = os.environ.get("WF_DISPATCH_MODE", "manual")
 
 data = json.loads(state_path.read_text(encoding="utf-8"))
 s = data["steps"][step]
@@ -86,6 +93,33 @@ roles = []
 for role in [primary] + supports:
     if role and role not in roles:
         roles.append(role)
+
+policy = {"defaults": {"allow_trust": False, "allowed_modes": ["manual", "headless", "launch"]}, "roles": {}}
+if policy_path.exists():
+    policy = json.loads(policy_path.read_text(encoding="utf-8"))
+defaults = policy.get("defaults", {})
+role_overrides = policy.get("roles", {})
+
+def role_allow_trust(role: str) -> bool:
+    role_cfg = role_overrides.get(role, {})
+    return bool(role_cfg.get("allow_trust", defaults.get("allow_trust", False)))
+
+def role_allowed_modes(role: str):
+    role_cfg = role_overrides.get(role, {})
+    modes = role_cfg.get("allowed_modes", defaults.get("allowed_modes", ["manual", "headless", "launch"]))
+    return [str(m).strip() for m in modes if str(m).strip()]
+
+violations = []
+for role in roles:
+    modes = role_allowed_modes(role)
+    if dispatch_mode not in modes:
+        violations.append(f"@{role}: mode '{dispatch_mode}' not allowed (allowed={modes})")
+    if trust_requested and not role_allow_trust(role):
+        violations.append(f"@{role}: --trust is denied by policy")
+
+if violations:
+    print("POLICY_VIOLATION|" + " ; ".join(violations))
+    raise SystemExit(2)
 
 step_name = s.get("name", "")
 kickoff_candidates = sorted((repo_root / "workflows" / "steps").glob(f"{int(step):02d}-*.md"))

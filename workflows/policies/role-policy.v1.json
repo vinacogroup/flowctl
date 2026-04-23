@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "description": "Role-level runtime guardrails for workflow dispatch.",
+  "defaults": {
+    "allow_trust": false,
+    "allowed_modes": ["manual", "headless", "launch"]
+  },
+  "roles": {
+    "pm": {
+      "allow_trust": false,
+      "allowed_modes": ["manual", "headless"]
+    },
+    "tech-lead": {
+      "allow_trust": false,
+      "allowed_modes": ["manual", "headless", "launch"]
+    }
+  }
+}
