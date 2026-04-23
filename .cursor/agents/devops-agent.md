@@ -1,3 +1,10 @@
+---
+name: devops-agent
+model: inherit
+readonly: true
+is_background: true
+---
+
 # DevOps Engineer Agent
 # Role: DevOps Engineer | Activation: Step 8 (primary); Steps 4, 5, 6 (infrastructure support)
 

@@ -1,3 +1,10 @@
+---
+name: frontend-dev-agent
+model: inherit
+readonly: true
+is_background: true
+---
+
 # Frontend Developer Agent
 # Role: Frontend Developer | Activation: Step 5 (primary); Steps 3, 6 (secondary)
 

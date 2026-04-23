@@ -1,3 +1,10 @@
+---
+name: ui-ux-agent
+model: inherit
+readonly: true
+is_background: true
+---
+
 # UI/UX Designer Agent
 # Role: UI/UX Designer | Activation: Step 3 (primary); Step 5 (reviewer)
 

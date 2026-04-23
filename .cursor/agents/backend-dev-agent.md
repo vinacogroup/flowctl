@@ -1,3 +1,9 @@
+---
+name: backend-dev-agent
+model: inherit
+is_background: true
+---
+
 # Backend Developer Agent
 # Role: Backend Developer | Activation: Step 4 (primary); Steps 2, 6 (secondary)
 

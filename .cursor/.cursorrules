@@ -1,0 +1,139 @@
+# IT Product Team Workflow - Global Cursor Rules
+# Version: 2.0.0 | Updated: 2026-04-23
+
+## AGENT SYSTEM OVERVIEW
+
+This repository uses a multi-agent architecture for IT product development.
+Seven specialized agents collaborate through a structured 9-step workflow.
+All agents MUST follow these global rules in addition to their role-specific definitions.
+
+## ACTIVE AGENTS
+
+- **PM Agent** (`pm-agent`): Requirements, roadmap, stakeholder management
+- **Tech Lead Agent** (`tech-lead-agent`): Architecture, technical decisions, code review
+- **Backend Dev Agent** (`backend-dev-agent`): API, database, business logic
+- **Frontend Dev Agent** (`frontend-dev-agent`): UI implementation, state management
+- **UI/UX Agent** (`ui-ux-agent`): Design system, user experience, prototypes
+- **DevOps Agent** (`devops-agent`): CI/CD, infrastructure, deployment
+- **QA Agent** (`qa-agent`): Testing strategy, quality assurance, bug tracking
+
+## INTEGRATED TOOLS
+
+### Graphify (Knowledge Graph)
+- Purpose: Build and query knowledge graphs of project context
+- Every agent MUST update Graphify after completing major tasks
+- Query Graphify to understand dependencies before making decisions
+- Commands: `graphify query <topic>`, `graphify update <node>`, `graphify link <a> <b>`
+
+### GitNexus (Git Intelligence)
+- Purpose: Smart git operations, PR management, code review automation
+- All git operations go through GitNexus for intelligent processing
+- Commands: `gitnexus commit`, `gitnexus branch`, `gitnexus pr`, `gitnexus review`
+- Features: Smart commits, branch strategy, merge conflict resolution
+
+## WORKFLOW RULES
+
+1. **Sequential Steps**: Follow the 9-step workflow in strict order
+2. **Approval Gates**: No step can begin without explicit human approval
+3. **Summaries**: Each step MUST produce a structured summary before approval request
+4. **Graphify Updates**: Update knowledge graph at each step completion
+5. **GitNexus Operations**: All code changes managed via GitNexus
+
+## AGENT ACTIVATION BY STEP
+
+| Step | Primary Agent | Secondary Agents |
+|------|--------------|-----------------|
+| 1 - Requirements Analysis | PM | Tech Lead |
+| 2 - System Design | Tech Lead | Backend Dev, PM |
+| 3 - UI/UX Design | UI/UX | Frontend Dev, PM |
+| 4 - Backend Development | Backend Dev | Tech Lead |
+| 5 - Frontend Development | Frontend Dev | UI/UX, Tech Lead |
+| 6 - Integration Testing | Tech Lead | Backend Dev, Frontend Dev |
+| 7 - QA Testing | QA | All Developers |
+| 8 - DevOps Deployment | DevOps | Tech Lead |
+| 9 - Review & Release | PM + Tech Lead | All Agents |
+
+## CODING STANDARDS
+
+### General
+- All code must have inline comments for complex logic
+- Follow language-specific style guides (PEP8 for Python, ESLint/Prettier for JS/TS)
+- Minimum 80% test coverage for all new code
+- No hardcoded secrets - use environment variables only
+
+### API Design
+- RESTful API standards with OpenAPI 3.0 specification
+- Versioning: `/api/v1/`, `/api/v2/`
+- Rate limiting on all public endpoints
+- Response time < 200ms for standard operations
+
+### Database
+- All migrations must be reversible
+- Index optimization for queries exceeding 100ms
+- Use connection pooling in production
+- Prefer soft deletes over hard deletes
+
+### Frontend
+- Component-based architecture
+- Mobile-first responsive design
+- WCAG 2.1 AA accessibility compliance
+- Performance: LCP < 2.5s, FID < 100ms, CLS < 0.1
+
+### Security
+- OWASP Top 10 compliance required
+- Input validation on all user inputs
+- Parameterized queries to prevent SQL injection
+- CSRF tokens on all state-changing operations
+
+## FILE NAMING CONVENTIONS
+
+- Workflow steps: `NN-step-name.md` (zero-padded numbers)
+- Summaries: `YYYY-MM-DD-step-name-summary.md`
+- Reviews: `YYYY-MM-DD-step-name-review.md`
+- Approvals: `YYYY-MM-DD-step-name-approval.md`
+
+## FORBIDDEN ACTIONS
+
+- NEVER commit directly to `main`/`master` branch
+- NEVER skip the review and approval process
+- NEVER deploy without QA sign-off
+- NEVER expose secrets or credentials in code
+- NEVER merge PRs without required approvals
+- NEVER proceed to the next step without human approval
+
+## REVIEW REQUIREMENTS
+
+Before any PR is merged:
+- [ ] Code review by Tech Lead (mandatory)
+- [ ] All CI/CD checks passing
+- [ ] Test coverage maintained or improved
+- [ ] No new security vulnerabilities (SAST scan)
+- [ ] Documentation updated
+- [ ] Graphify knowledge graph updated
+- [ ] GitNexus PR description complete and accurate
+
+## ESCALATION PATHS
+
+| Issue Type | Primary Contact | Escalation |
+|------------|----------------|-----------|
+| Technical Architecture | Tech Lead | CTO |
+| Product Decisions | PM | Product Owner |
+| Security Issues | DevOps | Security Team |
+| Performance Issues | Backend Dev | Tech Lead |
+| Design Decisions | UI/UX | PM + Tech Lead |
+| Deployment Issues | DevOps | Tech Lead |
+| Quality Gates | QA | Tech Lead + PM |
+
+## COMMUNICATION PROTOCOLS
+
+- Use structured summaries at each workflow step (see `templates/step-summary-template.md`)
+- Document all architectural decisions in ADR format
+- Update Graphify with every major decision
+- Tag agents by role when requesting input: `@pm`, `@tech-lead`, `@backend`, `@frontend`, `@ui-ux`, `@devops`, `@qa`
+
+## LANGUAGE CONVENTION
+
+- **Documentation & Workflow files**: Vietnamese
+- **Code, comments, commit messages**: English
+- **API documentation (OpenAPI)**: English
+- **User-facing content**: As defined in product requirements

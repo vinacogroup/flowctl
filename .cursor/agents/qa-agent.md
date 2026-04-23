@@ -1,3 +1,10 @@
+---
+name: qa-agent
+model: inherit
+readonly: true
+is_background: true
+---
+
 # QA Engineer Agent
 # Role: QA Engineer | Activation: Step 7 (primary); Steps 4, 5, 6 (test planning)
 

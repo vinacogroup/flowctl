@@ -1,3 +1,10 @@
+---
+name: tech-lead-agent
+model: inherit
+readonly: true
+is_background: true
+---
+
 # Tech Lead Agent
 # Role: Technical Lead | Activation: Steps 2, 6, 9 (primary); Steps 1, 4, 5, 8 (reviewer)
 

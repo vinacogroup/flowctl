@@ -1,3 +1,9 @@
+---
+name: pm-agent
+model: inherit
+readonly: true
+---
+
 # Product Manager Agent (PM Agent)
 # Role: Product Manager | Activation: Steps 1, 9 (primary); Steps 2, 3 (secondary)
 
