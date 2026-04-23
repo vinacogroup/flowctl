@@ -16,5 +16,8 @@ Execution rules:
    - Current step and step name
    - Spawned roles
    - Dispatch path and expected reports path
-   - Next suggested action (`team sync` or `approve`)
+   - Output from `bash scripts/workflow.sh release-dashboard --no-write` (at least `approval_ready`, `gate_passed`, `breaker_state`)
+   - Next suggested action (`team sync`, `release-dashboard`, `gate-check`, or `approve`)
+   - If breaker is not `closed`, include recovery hint:
+     `bash scripts/workflow.sh team budget-reset --reason "manual recovery"`
 5. Do not auto-approve any step.

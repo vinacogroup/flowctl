@@ -245,6 +245,16 @@ Khi có urgency hợp lý:
 - Remaining approvers phải ratify trong 24 giờ
 - Documented trong approval record
 
+### 5.5 PM Pre-Approval Checklist (Bắt buộc)
+Trước khi chạy `approve`, PM hoặc lead agent PHẢI kiểm tra theo thứ tự:
+1. `bash scripts/workflow.sh release-dashboard --no-write`
+   - `approval_ready: yes`
+   - `breaker_state: closed`
+2. `bash scripts/workflow.sh gate-check`
+   - Gate phải PASS (không dùng bypass trừ khi có quyết định rõ ràng)
+3. Chỉ khi 1 và 2 đều đạt mới được:
+   - `bash scripts/workflow.sh approve --by "Approver Name"`
+
 ## 6. Parallel Execution Rules
 
 ### 6.1 Các Phases Có Thể Chạy Song Song
