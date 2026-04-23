@@ -169,8 +169,8 @@ def render_rich(console):
 
     step       = wf.get("current_step", 0)
     step_name  = (wf.get("steps",{}).get(str(step),{}) or {}).get("name","—")
-    consumed   = stats.get("total_consumed_tokens", 0)
-    saved      = stats.get("total_saved_tokens", 0)
+    consumed   = stats.get("total_consumed_tokens") or stats.get("total_consumed", 0)
+    saved      = stats.get("total_saved_tokens") or stats.get("total_saved", 0)
     cost_usd   = stats.get("total_cost_usd", 0)
     saved_usd  = stats.get("total_saved_usd", 0)
     waste_tok  = stats.get("bash_waste_tokens", 0)
@@ -260,8 +260,8 @@ def render_ansi():
     turns   = group_into_turns(events)
     alerts  = check_alerts(stats, events)
 
-    consumed = stats.get("total_consumed_tokens", 0)
-    saved    = stats.get("total_saved_tokens", 0)
+    consumed = stats.get("total_consumed_tokens") or stats.get("total_consumed", 0)
+    saved    = stats.get("total_saved_tokens") or stats.get("total_saved", 0)
     cost_usd = stats.get("total_cost_usd", 0)
     saved_usd= stats.get("total_saved_usd", 0)
     waste    = stats.get("bash_waste_tokens", 0)
