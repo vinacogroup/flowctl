@@ -10,4 +10,7 @@ __pycache__/
 .gitnexus
 
 .cursor/debug-ac4b33.log
+.claude/worktrees/
 graphify-out/
+.neuralmemory/
+plans/
