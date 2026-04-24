@@ -2,8 +2,51 @@
   "name": "@vinacogroup/flowctl",
   "version": "1.0.0",
   "type": "module",
-  "description": "IT Product Team Workflow — MCP servers",
-  "private": true,
+  "description": "Workflow Orchestration for Cursor",
+  "private": false,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vinacogroup/flowctl.git"
+  },
+  "author": "Vinaco Group",
+  "license": "MIT",
+  "homepage": "https://github.com/vinacogroup/flowctl",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "keywords": [
+    "flowctl",
+    "workflow",
+    "mcp",
+    "cursor",
+    "workflow-orchestration",
+    "workflow-orchestration-mcp",
+    "workflow-orchestration-mcp-server",
+    "workflow-orchestration-mcp-server-shell-proxy",
+    "workflow-orchestration-mcp-server-workflow-state",
+    "shell-proxy",
+    "workflow-state"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "bin",
+    "scripts/flowctl.sh",
+    "scripts/workflow",
+    "templates",
+    "workflows/dispatch",
+    "workflows/gates",
+    "workflows/policies"
+  ],
+  "devDependencies": {
+    "husky": "^9.1.7"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "npm run setup-hooks"
+    }
+  },
   "bin": {
     "flowctl": "./bin/flowctl"
   },
