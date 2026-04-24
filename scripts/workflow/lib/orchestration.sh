@@ -265,7 +265,7 @@ if counts["running"] > 0 and used_runtime > 0:
 print(
     f"Budget: tokens={used_tokens}/{max_tokens_total} ({(used_tokens/max_tokens_total)*100:.1f}%) "
     f"runtime={used_runtime}/{max_runtime_total}s ({(used_runtime/max_runtime_total)*100:.1f}%) "
-    f"cost=${used_cost:.4f}/${max_cost_total:.4f} ({(used_cost/max_cost_total)*100:.1f}%) "
+    f"cost=\${used_cost:.4f}/\${max_cost_total:.4f} ({(used_cost/max_cost_total)*100:.1f}%) "
     f"breaker={(breaker.get('state') or 'closed')} eta_to_cap={eta_to_cap_seconds if eta_to_cap_seconds == '-' else str(eta_to_cap_seconds)+'s'}"
 )
 print(

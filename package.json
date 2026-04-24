@@ -52,7 +52,16 @@
   },
   "scripts": {
     "setup-hooks": "node scripts/setup-git-hooks.mjs",
-    "flowctl": "flowctl"
+    "flowctl": "flowctl",
+    "test": "bash scripts/test-workflow-tdd-regression.sh",
+    "test:tdd": "bash scripts/test-workflow-tdd-regression.sh",
+    "test:e2e": "bash scripts/test-workflow-e2e.sh",
+    "test:ci": "npm run test:tdd",
+    "release:patch": "npm version patch",
+    "release:minor": "npm version minor",
+    "release:major": "npm version major",
+    "release:push": "git push --follow-tags",
+    "prepare": "husky"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0"
