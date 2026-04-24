@@ -7,6 +7,7 @@ cmd_dispatch() {
   local dry_run="false"
   local force_run="false"
   local max_retries="3"
+  local worker_timeout="1800"
   local role_filter=""
   local budget_override_reason=""
   while [[ $# -gt 0 ]]; do
@@ -17,11 +18,12 @@ cmd_dispatch() {
       --dry-run) dry_run="true" ;;
       --force-run) force_run="true" ;;
       --max-retries) max_retries="${2:-3}"; shift ;;
+      --timeout) worker_timeout="${2:-1800}"; shift ;;
       --role) role_filter="${2:-}"; shift ;;
       --budget-override-reason) budget_override_reason="${2:-}"; shift ;;
       *)
         echo -e "${RED}Unknown option for dispatch: $1${NC}"
-        echo -e "Usage: flowctl dispatch [--launch|--headless] [--trust] [--dry-run] [--force-run] [--max-retries N] [--role name] [--budget-override-reason text]\n"
+        echo -e "Usage: flowctl dispatch [--launch|--headless] [--trust] [--dry-run] [--force-run] [--max-retries N] [--timeout N] [--role name] [--budget-override-reason text]\n"
         exit 1
         ;;
     esac
