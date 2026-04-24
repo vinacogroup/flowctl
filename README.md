@@ -130,7 +130,7 @@ Ví dụ `.cursor/mcp.json`:
 
 ### Hạ tầng/MCP
 
-- `flowctl monitor [--once] [--port=N] [--tui] [--interval=N]` (mặc định mở web dashboard localhost, `--tui` để dùng terminal UI)
+- `flowctl monitor [--once] [--port=N] [--interval=N]` (mở web dashboard tại localhost)
 - `flowctl mcp --shell-proxy`
 - `flowctl mcp --workflow-state`
 

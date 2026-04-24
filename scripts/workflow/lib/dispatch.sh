@@ -39,7 +39,7 @@ cmd_dispatch() {
   local step
   step=$(wf_require_initialized_workflow)
   local flow_id
-  flow_id=$(WF_STATE_FILE="$STATE_FILE" python3 - <<'PY'
+  flow_id=$(WF_STATE_FILE="$STATE_FILE" timeout 30 python3 - <<'PY'
 import json
 import os
 import uuid
@@ -54,7 +54,7 @@ if not wid:
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 print(wid)
 PY
-)
+) || { echo -e "${RED}Lỗi: không đọc được flow_id từ state (timeout 30s). Kiểm tra flowctl-state.json.${NC}" >&2; exit 1; }
   local run_id
   run_id="run-$(date -u '+%Y%m%dT%H%M%SZ')-$RANDOM"
   local dispatch_mode="manual"
@@ -360,7 +360,7 @@ PY
         base_cmd="agent ${trust_part}--workspace \"$REPO_ROOT\" --resume \"$role_chat_id\""
       fi
       local headless_cmd
-      headless_cmd="${base_cmd} -p \"Thực hiện task theo brief, và GHI report đầy đủ vào file ${report_path}. Chỉ trả lời ngắn 'done' sau khi ghi file.\" --output-format stream-json --stream-partial-output 2>&1 | python3 \"${capture_script}\" --step \"${step}\" --role \"${role}\" --flowctl-id \"${flow_id}\" --run-id \"${run_id}\" --log-path \"${log_path}\" --heartbeats-path \"${HEARTBEATS_FILE}\""
+      headless_cmd="timeout ${worker_timeout} ${base_cmd} -p \"Thực hiện task theo brief, và GHI report đầy đủ vào file ${report_path}. Chỉ trả lời ngắn 'done' sau khi ghi file.\" --output-format stream-json --stream-partial-output 2>&1 | python3 \"${capture_script}\" --step \"${step}\" --role \"${role}\" --flowctl-id \"${flow_id}\" --run-id \"${run_id}\" --log-path \"${log_path}\" --heartbeats-path \"${HEARTBEATS_FILE}\""
       local idem_key="step:${step}:role:${role}:mode:headless"
       local idem_decision
       idem_decision=$(WF_IDEMPOTENCY_FILE="$IDEMPOTENCY_FILE" WF_IDEMPOTENCY_KEY="$idem_key" WF_FORCE_RUN="$force_run" WF_MAX_RETRIES="$max_retries" python3 - <<'PY'

@@ -680,8 +680,7 @@ case "$CMD" in
     cmd_mercenary "$SUBCMD" "$@"
     ;;
   monitor|mon)
-    if [[ "${1:-}" == "--tui" ]]; then shift; python3 "$WORKFLOW_ROOT/scripts/monitor.py" "$@";
-    else python3 "$WORKFLOW_ROOT/scripts/monitor-web.py" "$@"; fi
+    python3 "$WORKFLOW_ROOT/scripts/monitor-web.py" "$@"
     ;;
   retro)        cmd_retro "$@" ;;
   complexity)   cmd_complexity ;;
@@ -698,8 +697,8 @@ case "$CMD" in
     echo -e "  init --project \"Name\" [--no-setup]  Khởi tạo dự án (+ setup mặc định)"
     echo -e "  status                 Xem trạng thái"
     echo -e "  start                  Bắt đầu step hiện tại"
-    echo -e "  monitor [--once] [--port=N] [--tui] [--interval=N]"
-    echo -e "                         Web dashboard localhost, --tui = terminal GUI cu"
+    echo -e "  monitor [--once] [--port=N] [--interval=N]"
+    echo -e "                         Mở web dashboard tại localhost"
     echo -e "  mcp --shell-proxy|--workflow-state"
     echo -e "                         Chạy MCP servers qua flowctl wrapper"
     echo -e "  complexity             Đánh giá complexity score của step hiện tại"
