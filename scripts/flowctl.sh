@@ -26,6 +26,7 @@
 #                            PM-only orchestration: step-based spawn/collect/summary
 #   brainstorm [topic]       One-shot: init (if needed) + step-based delegate
 #   summary                  In summary của step hiện tại
+#   audit-tokens             Audit token overhead/work từ MCP events
 #   release-dashboard        PM release summary cho approve decision
 #   reset <step>             Reset về step cụ thể (cần confirm)
 #   history                  Lịch sử approvals
@@ -194,6 +195,15 @@ cmd_mcp() {
   fi
 
   exec node "$target"
+}
+
+cmd_audit_tokens() {
+  local audit_script="$WORKFLOW_ROOT/scripts/token-audit.py"
+  if [[ ! -f "$audit_script" ]]; then
+    wf_error "Không tìm thấy token audit script: $audit_script"
+    exit 1
+  fi
+  python3 "$audit_script" "$@"
 }
 
 cmd_init() {
@@ -640,7 +650,7 @@ CMD="${1:-status}"
 shift || true
 
 case "$CMD" in
-  init|start|gate-check|approve|reject|conditional|blocker|decision|dispatch|cursor-dispatch|collect|team|reset|brainstorm|release-dashboard|war-room|mercenary|retro|complexity)
+  init|start|gate-check|approve|reject|conditional|blocker|decision|dispatch|cursor-dispatch|collect|team|reset|brainstorm|release-dashboard|war-room|mercenary|retro|complexity|audit-tokens|audit)
     wf_acquire_flow_lock
     ;;
   *)
@@ -688,6 +698,7 @@ case "$CMD" in
   team)         cmd_team "$@" ;;
   brainstorm|bs) cmd_brainstorm "$@" ;;
   summary|sum)  cmd_summary ;;
+  audit-tokens|audit) cmd_audit_tokens "$@" ;;
   release-dashboard|dashboard) cmd_release_dashboard "$@" ;;
   history|h)    cmd_history ;;
   reset)        cmd_reset "$@" ;;
@@ -722,6 +733,8 @@ case "$CMD" in
     echo -e "                         PM-only orchestration cho sub-agents"
     echo -e "  brainstorm [topic]     One-shot auto init + delegate theo current step"
     echo -e "  summary                Tóm tắt step hiện tại"
+    echo -e "  audit-tokens [--days N] [--format table|markdown|json] [--limit N]"
+    echo -e "                         Audit token overhead/work và break-even"
     echo -e "  release-dashboard      PM release summary"
     echo -e "  history                Lịch sử approvals"
     echo -e "  reset <step>           Reset về step cụ thể"

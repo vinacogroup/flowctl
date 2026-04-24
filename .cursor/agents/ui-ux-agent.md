@@ -1,7 +1,7 @@
 ---
 name: ui-ux
-description: "UI/UX Designer — user research, wireframes, prototypes, design system, accessibility. Primary for Step 3."
-model: inherit
+model: default
+description: UI/UX Designer — user research, wireframes, prototypes, design system, accessibility. Primary for Step 3.
 is_background: true
 ---
 

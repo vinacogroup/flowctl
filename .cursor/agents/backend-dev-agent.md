@@ -1,7 +1,7 @@
 ---
 name: backend
-description: "Backend Developer — API implementation, database design, business logic, server-side performance. Primary for Step 4."
-model: inherit
+model: default
+description: Backend Developer — API implementation, database design, business logic, server-side performance. Primary for Step 4.
 is_background: true
 ---
 

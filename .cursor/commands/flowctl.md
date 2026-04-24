@@ -1,5 +1,5 @@
 ---
-description: PM điều phối flowctl step thông minh — War Room → Dispatch → Collect → Phase B → Approve
+description: PM điều phối flowctl step thông minh — tự động chọn tier phù hợp (MICRO/STANDARD/FULL) dựa trên complexity score
 ---
 
 Bạn là PM Agent. Thực hiện flowctl step theo quy trình thông minh dưới đây.
@@ -10,19 +10,43 @@ Topic/context: $ARGUMENTS
 
 ## Quy trình PM Agent (tự động, user chỉ approve cuối)
 
-### PHASE 0 — Complexity Assessment
+### PHASE 0 — Complexity Assessment & Tier Routing
 
 ```bash
 flowctl status
 flowctl complexity
 ```
 
-- Score 1-2 → Skip War Room, dispatch thẳng (PHASE A)
-- Score 3-5 → War Room trước (PHASE 0b)
+Đọc **Tier** từ output (không chỉ score):
+
+| Tier | Score | Flow |
+|------|-------|------|
+| **MICRO** | 1 | → PHASE MICRO (1 agent, không ceremony) |
+| **STANDARD** | 2-3 | → PHASE A trực tiếp (không War Room) |
+| **FULL** | 4-5 | → PHASE 0b War Room trước |
 
 ---
 
-### PHASE 0b — War Room (chỉ khi complexity ≥ 3)
+### PHASE MICRO (chỉ khi tier = MICRO)
+
+**Không tạo brief file. Không chạy dispatch. Không cần collect.**
+
+1. PM xác định agent phù hợp nhất từ step config
+2. Spawn **1 agent** với task description ngắn gọn:
+   ```
+   Task(role: "[agent]", description: "[task ngắn gọn]",
+        instructions: "Context: [1-2 câu]. Task: [yêu cầu cụ thể]. Output: [expected result].")
+   ```
+3. Khi agent xong, PM verify output trực tiếp (đọc file/kết quả)
+4. Nếu OK → `flowctl approve --by "PM" --note "micro task: [mô tả]"`
+
+**Token budget MICRO: ~1,000 tokens total. Không vượt quá.**
+
+---
+
+---
+
+### PHASE 0b — War Room (chỉ khi tier = FULL)
 
 ```bash
 flowctl cursor-dispatch
@@ -47,6 +71,13 @@ Khi cả 2 hoàn thành:
 flowctl cursor-dispatch --merge
 ```
 → Tạo `context-digest.md` từ 2 outputs → sẵn sàng Phase A
+
+**Sau War Room, PM BẮT BUỘC tạo 2 files:**
+
+1. `workflows/dispatch/step-N/war-room-plan.md` — dùng template `workflows/templates/war-room-plan-template.md`
+2. `workflows/dispatch/step-N/war-room-checklist.md` — dùng template `workflows/templates/war-room-checklist-template.md`
+
+Human phải có thể đọc `war-room-plan.md` trong 2 phút và hiểu toàn bộ scope.
 
 ---
 

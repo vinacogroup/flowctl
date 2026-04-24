@@ -15,6 +15,28 @@ Mọi agent đều PHẢI tuân thủ quy trình 9 bước. Không có agent nà
 - **Mọi thay đổi phải có lý do**: Khi thay đổi approach hoặc scope, phải ghi lại nguyên nhân
 - **Mọi risk phải được escalate ngay**: Nếu phát hiện risk, phải report cho relevant agents trong vòng 2 giờ
 
+### 1.3 Evidence Requirements (BẮT BUỘC)
+
+Mọi DELIVERABLE claim trong report PHẢI có evidence xác thực:
+
+```markdown
+# Format bắt buộc trong report:
+DELIVERABLE: path/to/file.ts — mô tả ngắn gọn
+EVIDENCE: file_exists          ← file đã tồn tại trên disk (collect tự verify)
+
+DELIVERABLE: API /users endpoint
+EVIDENCE: test_output — 12 tests passed (0 failed)
+
+DELIVERABLE: Design mockup
+EVIDENCE: figma_url — https://figma.com/...
+```
+
+**Quy tắc:**
+- Nếu DELIVERABLE là file path → collect script tự động verify file tồn tại. Nếu không có file thực → report bị flag ⚠️ UNVERIFIED.
+- Nếu DELIVERABLE không phải file → PHẢI có tag `EVIDENCE:` với proof cụ thể (test output, URL, git commit hash, v.v.)
+- Report thiếu EVIDENCE hoặc bị UNVERIFIED → PM **không được approve** step.
+- **Không có EVIDENCE = không có done.**
+
 ### 1.3 Communication Standards
 - Sử dụng structured markdown cho tất cả communications
 - Tag agents khi cần input: `@pm`, `@tech-lead`, `@backend`, `@frontend`, `@ui-ux`, `@devops`, `@qa`

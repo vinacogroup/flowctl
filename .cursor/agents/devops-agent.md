@@ -1,7 +1,7 @@
 ---
 name: devops
-description: "DevOps Engineer — CI/CD pipelines, infrastructure, deployment, monitoring, security scanning. Primary for Step 8."
-model: inherit
+model: default
+description: DevOps Engineer — CI/CD pipelines, infrastructure, deployment, monitoring, security scanning. Primary for Step 8.
 is_background: true
 ---
 

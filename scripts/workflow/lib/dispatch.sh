@@ -568,6 +568,7 @@ def has_blocker(source: str, description: str) -> bool:
 new_decisions = 0
 new_blockers = 0
 new_deliverables = 0
+new_unverified = 0
 
 for rf in report_files:
     rel = str(rf.relative_to(repo_root))
@@ -603,7 +604,26 @@ for rf in report_files:
         elif s.startswith("DELIVERABLE:"):
             item = s[len("DELIVERABLE:"):].strip()
             if item and not has_deliverable(item):
-                deliverables.append(item)
+                # Extract file path (before ' — ' or ' - ' separator)
+                import re as _re
+                path_part = _re.split(r'\s+[—\-]\s+', item)[0].strip()
+                is_file_claim = (
+                    "/" in path_part or
+                    _re.search(r'\.\w{1,6}$', path_part) is not None
+                ) and not path_part.startswith("http")
+                verified = True
+                if is_file_claim:
+                    candidate = repo_root / path_part
+                    if not candidate.exists():
+                        verified = False
+                deliverables.append({
+                    "claim": item,
+                    "path": path_part if is_file_claim else None,
+                    "verified": verified,
+                    "source": rel,
+                } if is_file_claim else item)
+                if not verified:
+                    new_unverified += 1
                 new_deliverables += 1
 
 data["metrics"]["total_decisions"] = max(data["metrics"].get("total_decisions", 0), 0) + new_decisions
@@ -623,7 +643,7 @@ if idempotency_path.exists():
             idempotency[key]["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     idempotency_path.write_text(json.dumps(idempotency, indent=2, ensure_ascii=False), encoding="utf-8")
 
-print(f"COLLECTED reports={len(report_files)} deliverables+={new_deliverables} decisions+={new_decisions} blockers+={new_blockers}")
+print(f"COLLECTED reports={len(report_files)} deliverables+={new_deliverables} decisions+={new_decisions} blockers+={new_blockers} unverified={new_unverified}")
 PY
 )
   local collect_status="$?"
@@ -649,8 +669,19 @@ print(f"Step {step}: deliverables={len(s.get('deliverables', []))}, decisions={l
 PY
 )
 
+  # Extract unverified count from collect output
+  local unverified_count=0
+  unverified_count=$(echo "$collect_raw" | grep -oP 'unverified=\K[0-9]+' || echo "0")
+
   echo -e "\n${GREEN}${BOLD}Collect hoàn tất.${NC}"
   echo -e "${collect_output}"
+
+  if [[ "$unverified_count" -gt 0 ]]; then
+    echo -e "\n${RED}${BOLD}⚠️  UNVERIFIED DELIVERABLES: ${unverified_count}${NC}"
+    echo -e "${RED}Một số DELIVERABLE: claims trỏ đến file không tồn tại trên disk.${NC}"
+    echo -e "${RED}→ Kiểm tra lại reports. Gate-check sẽ FAIL cho đến khi resolve.${NC}\n"
+  fi
+
   local evidence_capture
   evidence_capture=$(wf_evidence_capture_step "$step" 2>/dev/null || true)
   if [[ -n "$evidence_capture" ]]; then

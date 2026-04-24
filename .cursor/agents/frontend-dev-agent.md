@@ -1,7 +1,7 @@
 ---
 name: frontend
-description: "Frontend Developer — UI implementation, state management, component architecture, web performance. Primary for Step 5."
-model: inherit
+model: default
+description: Frontend Developer — UI implementation, state management, component architecture, web performance. Primary for Step 5.
 is_background: true
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: tech-lead
-description: "Tech Lead — system design, architecture decisions, code review, integration oversight. Primary for Steps 2, 6; reviewer for all dev steps."
-model: inherit
+model: default
+description: Tech Lead — system design, architecture decisions, code review, integration oversight. Primary for Steps 2, 6; reviewer for all dev steps.
 is_background: true
 ---
 

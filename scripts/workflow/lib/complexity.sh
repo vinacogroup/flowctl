@@ -51,22 +51,43 @@ print(score)
 PY
 }
 
+wf_complexity_tier() {
+  local score="$1"
+  if [[ "$score" -le 1 ]]; then
+    echo "MICRO"
+  elif [[ "$score" -le 3 ]]; then
+    echo "STANDARD"
+  else
+    echo "FULL"
+  fi
+}
+
 cmd_complexity() {
   local step
   step=$(wf_require_initialized_workflow)
   local score
   score=$(wf_complexity_score "$step")
+  local tier
+  tier=$(wf_complexity_tier "$score")
 
   local label verdict color
-  if [[ "$score" -le 2 ]]; then
-    label="LOW"; verdict="Skip War Room → dispatch trực tiếp"; color="$GREEN"
-  elif [[ "$score" -eq 3 ]]; then
-    label="MEDIUM"; verdict="War Room recommended"; color="$YELLOW"
-  else
-    label="HIGH"; verdict="War Room required"; color="$RED"
-  fi
+  case "$tier" in
+    MICRO)
+      label="MICRO"; color="$GREEN"
+      verdict="1 agent, no brief/report ceremony → PM assign trực tiếp"
+      ;;
+    STANDARD)
+      label="STANDARD"; color="$YELLOW"
+      verdict="1-3 agents, brief + report, no War Room → dispatch thẳng"
+      ;;
+    FULL)
+      label="FULL"; color="$RED"
+      verdict="Full flow: War Room → Dispatch all agents → Collect → Phase B"
+      ;;
+  esac
 
   echo -e "\n${BOLD}Complexity Score — Step $step${NC}"
   echo -e "  Score : ${color}${BOLD}$score / 5${NC} ($label)"
+  echo -e "  Tier  : ${color}${BOLD}$tier${NC}"
   echo -e "  Action: $verdict\n"
 }

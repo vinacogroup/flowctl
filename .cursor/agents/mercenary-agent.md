@@ -1,7 +1,7 @@
 ---
 name: mercenary
-description: "Specialist mercenary agent — stateless, task-specific. Use for targeted research, security audits, UX validation, or technical validation when spawned by PM via Phase B."
-model: inherit
+model: default
+description: Specialist mercenary agent — stateless, task-specific. Use for targeted research, security audits, UX validation, or technical validation when spawned by PM via Phase B.
 is_background: true
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: qa
-description: "QA Engineer — test strategy, test cases, bug tracking, quality gates, regression testing. Primary for Step 7."
-model: inherit
+model: default
+description: QA Engineer — test strategy, test cases, bug tracking, quality gates, regression testing. Primary for Step 7.
 is_background: true
 ---
 
