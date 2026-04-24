@@ -60,7 +60,7 @@
     "release:patch": "npm version patch",
     "release:minor": "npm version minor",
     "release:major": "npm version major",
-    "release:push": "git push --follow-tags",
+    "release:push": "git push -u origin HEAD --follow-tags",
     "prepare": "husky"
   },
   "dependencies": {
