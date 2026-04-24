@@ -1,3 +1,15 @@
+---
+name: code-review
+description: "Structured review workflow for correctness, risk, and maintainability"
+triggers: ["review", "pull-request", "refactor", "quality"]
+when-to-use: "Use for code review requests, defect prevention, and pre-merge quality checks."
+when-not-to-use: "Do not use for production incident triage; use debugging or incident-response skills."
+prerequisites: []
+estimated-tokens: 3386
+roles-suggested: ["tech-lead", "backend", "frontend", "qa"]
+version: "1.0.0"
+tags: ["quality", "review"]
+---
 # Kỹ Năng Code Review
 # Skill: Code Review | Used by: Tech Lead, all developers | Version: 1.0.0
 

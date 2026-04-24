@@ -1,3 +1,15 @@
+---
+name: testing
+description: "Testing strategy and execution patterns across unit, integration, and E2E"
+triggers: ["test", "qa", "regression", "coverage"]
+when-to-use: "Use when designing, implementing, or reviewing automated test strategy and suites."
+when-not-to-use: "Do not use for architecture tradeoff decisions without test implementation scope."
+prerequisites: []
+estimated-tokens: 6405
+roles-suggested: ["qa", "backend", "frontend", "tech-lead"]
+version: "1.0.0"
+tags: ["testing", "quality"]
+---
 # Kỹ Năng Testing
 # Skill: Software Testing | Used by: QA, Backend Dev, Frontend Dev | Version: 1.0.0
 

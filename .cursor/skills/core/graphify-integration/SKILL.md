@@ -1,3 +1,15 @@
+---
+name: graphify-integration
+description: "Graphify usage patterns for architecture discovery and dependency context"
+triggers: ["graphify", "architecture", "dependency", "query"]
+when-to-use: "Use when you need architecture-level context and relationship mapping from Graphify."
+when-not-to-use: "Do not use when task scope is strictly local and does not require graph traversal."
+prerequisites: []
+estimated-tokens: 4696
+roles-suggested: ["tech-lead", "backend", "frontend", "devops"]
+version: "1.0.0"
+tags: ["graph", "architecture"]
+---
 # Kỹ Năng Tích Hợp Graphify
 # Skill: Graphify Knowledge Graph Integration | Version: 1.0.0
 

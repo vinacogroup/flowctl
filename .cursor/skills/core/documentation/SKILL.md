@@ -1,3 +1,15 @@
+---
+name: documentation
+description: "Practical documentation standards for technical specs, guides, and handoffs"
+triggers: ["docs", "readme", "spec", "handoff"]
+when-to-use: "Use for writing or improving technical documentation with clear structure and intent."
+when-not-to-use: "Do not use for code changes that need implementation-first workflows."
+prerequisites: []
+estimated-tokens: 4324
+roles-suggested: ["pm", "tech-lead", "ui-ux", "backend", "frontend"]
+version: "1.0.0"
+tags: ["docs", "communication"]
+---
 # Kỹ Năng Documentation
 # Skill: Technical Documentation | Used by: All agents | Version: 1.0.0
 

@@ -1,3 +1,15 @@
+---
+name: flowctl
+description: "Operational guide for step-based flowctl orchestration commands"
+triggers: ["flowctl", "workflow", "approve", "dispatch"]
+when-to-use: "Use when operating the flowctl workflow lifecycle and command orchestration."
+when-not-to-use: "Do not use for deep code debugging unrelated to workflow orchestration."
+prerequisites: []
+estimated-tokens: 571
+roles-suggested: ["pm", "tech-lead", "devops"]
+version: "1.0.0"
+tags: ["orchestration", "workflow"]
+---
 # flowctl-conduct
 
 ## Mục tiêu

@@ -1,3 +1,15 @@
+---
+name: gitnexus-integration
+description: "GitNexus workflows for impact analysis, context lookup, and safe refactoring"
+triggers: ["gitnexus", "impact", "context", "refactor"]
+when-to-use: "Use when modifying symbols and needing blast-radius/context before code changes."
+when-not-to-use: "Do not use for non-code tasks where call-graph analysis is unnecessary."
+prerequisites: ["gitnexus index up-to-date"]
+estimated-tokens: 5053
+roles-suggested: ["tech-lead", "backend", "frontend", "devops", "qa"]
+version: "1.0.0"
+tags: ["analysis", "refactoring"]
+---
 # Kỹ Năng Tích Hợp GitNexus
 # Skill: GitNexus Git Intelligence Integration | Version: 1.0.0
 
