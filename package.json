@@ -1,5 +1,5 @@
 {
-  "name": "flowctl",
+  "name": "@vinacogroup/flowctl",
   "version": "1.0.0",
   "type": "module",
   "description": "IT Product Team Workflow — MCP servers",
