@@ -7,6 +7,7 @@ cmd_dispatch() {
   local dry_run="false"
   local force_run="false"
   local max_retries="3"
+  local worker_timeout="1800"
   local role_filter=""
   local budget_override_reason=""
   while [[ $# -gt 0 ]]; do
@@ -17,11 +18,12 @@ cmd_dispatch() {
       --dry-run) dry_run="true" ;;
       --force-run) force_run="true" ;;
       --max-retries) max_retries="${2:-3}"; shift ;;
+      --timeout) worker_timeout="${2:-1800}"; shift ;;
       --role) role_filter="${2:-}"; shift ;;
       --budget-override-reason) budget_override_reason="${2:-}"; shift ;;
       *)
         echo -e "${RED}Unknown option for dispatch: $1${NC}"
-        echo -e "Usage: flowctl dispatch [--launch|--headless] [--trust] [--dry-run] [--force-run] [--max-retries N] [--role name] [--budget-override-reason text]\n"
+        echo -e "Usage: flowctl dispatch [--launch|--headless] [--trust] [--dry-run] [--force-run] [--max-retries N] [--timeout N] [--role name] [--budget-override-reason text]\n"
         exit 1
         ;;
     esac
@@ -39,7 +41,7 @@ cmd_dispatch() {
   local step
   step=$(wf_require_initialized_workflow)
   local flow_id
-  flow_id=$(WF_STATE_FILE="$STATE_FILE" python3 - <<'PY'
+  flow_id=$(WF_STATE_FILE="$STATE_FILE" timeout 30 python3 - <<'PY'
 import json
 import os
 import uuid
@@ -54,7 +56,7 @@ if not wid:
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 print(wid)
 PY
-)
+) || { echo -e "${RED}Lỗi: không đọc được flow_id từ state (timeout 30s). Kiểm tra flowctl-state.json.${NC}" >&2; exit 1; }
   local run_id
   run_id="run-$(date -u '+%Y%m%dT%H%M%SZ')-$RANDOM"
   local dispatch_mode="manual"
@@ -360,7 +362,7 @@ PY
         base_cmd="agent ${trust_part}--workspace \"$REPO_ROOT\" --resume \"$role_chat_id\""
       fi
       local headless_cmd
-      headless_cmd="${base_cmd} -p \"Thực hiện task theo brief, và GHI report đầy đủ vào file ${report_path}. Chỉ trả lời ngắn 'done' sau khi ghi file.\" --output-format stream-json --stream-partial-output 2>&1 | python3 \"${capture_script}\" --step \"${step}\" --role \"${role}\" --flowctl-id \"${flow_id}\" --run-id \"${run_id}\" --log-path \"${log_path}\" --heartbeats-path \"${HEARTBEATS_FILE}\""
+      headless_cmd="timeout ${worker_timeout} ${base_cmd} -p \"Thực hiện task theo brief, và GHI report đầy đủ vào file ${report_path}. Chỉ trả lời ngắn 'done' sau khi ghi file.\" --output-format stream-json --stream-partial-output 2>&1 | python3 \"${capture_script}\" --step \"${step}\" --role \"${role}\" --flowctl-id \"${flow_id}\" --run-id \"${run_id}\" --log-path \"${log_path}\" --heartbeats-path \"${HEARTBEATS_FILE}\""
       local idem_key="step:${step}:role:${role}:mode:headless"
       local idem_decision
       idem_decision=$(WF_IDEMPOTENCY_FILE="$IDEMPOTENCY_FILE" WF_IDEMPOTENCY_KEY="$idem_key" WF_FORCE_RUN="$force_run" WF_MAX_RETRIES="$max_retries" python3 - <<'PY'

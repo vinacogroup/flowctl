@@ -15,31 +15,33 @@ print(val if val is not None else '')
 wf_json_set() {
   # $1 = dot-path, $2 = value (string), $3 = type (string|number|null)
   python3 -c "
-import json
+import json, fcntl
 from datetime import datetime
 
-with open('$STATE_FILE', 'r') as f:
+with open('$STATE_FILE', 'r+') as f:
+    fcntl.flock(f, fcntl.LOCK_EX)
     data = json.load(f)
 
-keys = '$1'.split('.')
-obj = data
-for k in keys[:-1]:
-    obj = obj.setdefault(k, {})
+    keys = '$1'.split('.')
+    obj = data
+    for k in keys[:-1]:
+        obj = obj.setdefault(k, {})
 
-val = '$2'
-typ = '${3:-string}'
-if typ == 'number':
-    obj[keys[-1]] = int(val)
-elif typ == 'null' or val == 'null':
-    obj[keys[-1]] = None
-elif typ == 'bool':
-    obj[keys[-1]] = val.lower() == 'true'
-else:
-    obj[keys[-1]] = val
+    val = '$2'
+    typ = '${3:-string}'
+    if typ == 'number':
+        obj[keys[-1]] = int(val)
+    elif typ == 'null' or val == 'null':
+        obj[keys[-1]] = None
+    elif typ == 'bool':
+        obj[keys[-1]] = val.lower() == 'true'
+    else:
+        obj[keys[-1]] = val
 
-data['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    data['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-with open('$STATE_FILE', 'w') as f:
+    f.seek(0)
+    f.truncate()
     json.dump(data, f, indent=2, ensure_ascii=False)
 " 2>/dev/null
 }
@@ -47,23 +49,25 @@ with open('$STATE_FILE', 'w') as f:
 wf_json_append() {
   # $1 = dot-path to array, $2 = JSON object string
   python3 -c "
-import json
+import json, fcntl
 from datetime import datetime
 
-with open('$STATE_FILE', 'r') as f:
+with open('$STATE_FILE', 'r+') as f:
+    fcntl.flock(f, fcntl.LOCK_EX)
     data = json.load(f)
 
-keys = '$1'.split('.')
-obj = data
-for k in keys[:-1]:
-    obj = obj[k]
+    keys = '$1'.split('.')
+    obj = data
+    for k in keys[:-1]:
+        obj = obj[k]
 
-arr = obj.setdefault(keys[-1], [])
-arr.append(json.loads('''$2'''))
+    arr = obj.setdefault(keys[-1], [])
+    arr.append(json.loads('''$2'''))
 
-data['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    data['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-with open('$STATE_FILE', 'w') as f:
+    f.seek(0)
+    f.truncate()
     json.dump(data, f, indent=2, ensure_ascii=False)
 " 2>/dev/null
 }
