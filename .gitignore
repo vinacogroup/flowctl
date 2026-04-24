@@ -1,7 +1,9 @@
 node_modules/
 .cache/
-package-lock.json
 workflows/
 flow-state.json
 __pycache__/
 .graphify/
+
+!/.github/workflows/
+!/.github/workflows/*.yml
