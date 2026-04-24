@@ -405,37 +405,43 @@ def main():
             try: _interval_ref[0] = float(arg.split("=")[1])
             except: pass
 
-    signal.signal(signal.SIGINT, lambda *_: sys.exit(0))
+    def _handle_stop(*_):
+        _state["quit"] = True
+    signal.signal(signal.SIGINT, _handle_stop)
+    signal.signal(signal.SIGTERM, _handle_stop)
 
     if _interval_ref[0] == 0:
         Console().print(render_rich()) if USE_RICH else render_ansi()
         return
 
-    threading.Thread(target=_key_reader, daemon=True).start()
+    interactive_tty = sys.stdin.isatty() and sys.stdout.isatty() and os.environ.get("TERM", "") != "dumb"
+    if interactive_tty:
+        threading.Thread(target=_key_reader, daemon=True).start()
 
     def _render_loop(draw_fn):
         last_render = 0.0
-        # Enter alternate screen manually — bypasses Rich's terminal detection
-        sys.stdout.write("\033[?1049h\033[2J\033[H"); sys.stdout.flush()
-        try:
-            while not _state["quit"]:
-                now = time.time()
-                should = (not _state["paused"] or _state["force_refresh"]) and \
-                         (now - last_render >= _interval_ref[0] or _state["force_refresh"])
-                if should:
-                    _state["force_refresh"] = False
-                    last_render = now
-                    sys.stdout.write("\033[2J\033[H"); sys.stdout.flush()
-                    draw_fn()
-                time.sleep(0.05)
-        finally:
-            sys.stdout.write("\033[?1049l"); sys.stdout.flush()  # restore normal screen
+        while not _state["quit"]:
+            now = time.time()
+            should = (not _state["paused"] or _state["force_refresh"]) and \
+                     (now - last_render >= _interval_ref[0] or _state["force_refresh"])
+            if should:
+                _state["force_refresh"] = False
+                last_render = now
+                draw_fn()
+            time.sleep(0.05)
 
-    if USE_RICH:
-        console = Console(force_terminal=True)
+    if USE_RICH and interactive_tty:
+        console = Console()
+        with Live(render_rich(live_mode=True), console=console, screen=True, auto_refresh=False) as live:
+            _render_loop(lambda: live.update(render_rich(live_mode=True), refresh=True))
+    elif USE_RICH:
+        console = Console()
         _render_loop(lambda: console.print(render_rich()))
     else:
-        _render_loop(render_ansi)
+        if interactive_tty:
+            _render_loop(render_ansi)
+        else:
+            _render_loop(lambda: print("[monitor] interactive UI requires a TTY. Use --once for snapshot output."))
 
 if __name__ == "__main__":
     main()

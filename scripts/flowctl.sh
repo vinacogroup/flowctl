@@ -8,7 +8,7 @@
 #   flowctl <command> [args]
 #
 # Commands:
-#   init --project "Name"    Khởi tạo flowctl cho project mới
+#   init --project "Name" [--no-setup]   Khởi tạo + mặc định chạy scripts/setup.sh (Graphify/MCP)
 #   status                   Xem trạng thái hiện tại
 #   start                    Bắt đầu step hiện tại
 #   approve [--by "Name"]    Approve step hiện tại → advance
@@ -80,7 +80,6 @@ ensure_project_scaffold() {
   local overwrite_existing="${1:-false}"
   local template_state="$WORKFLOW_ROOT/templates/flowctl-state.template.json"
   local had_state="false"
-  local had_mcp="false"
   local had_settings="false"
   local state_status="skipped"
   local mcp_status="skipped"
@@ -89,7 +88,6 @@ ensure_project_scaffold() {
   mkdir -p "$PROJECT_ROOT/.cursor" "$PROJECT_ROOT/.claude"
 
   [[ -f "$STATE_FILE" ]] && had_state="true"
-  [[ -f "$PROJECT_ROOT/.cursor/mcp.json" ]] && had_mcp="true"
   [[ -f "$PROJECT_ROOT/.claude/settings.json" ]] && had_settings="true"
 
   if [[ ! -f "$STATE_FILE" || "$overwrite_existing" == "true" ]]; then
@@ -107,34 +105,36 @@ ensure_project_scaffold() {
     fi
   fi
 
-  if [[ ! -f "$PROJECT_ROOT/.cursor/mcp.json" || "$overwrite_existing" == "true" ]]; then
-    cat > "$PROJECT_ROOT/.cursor/mcp.json" <<EOF
-{
-  "mcpServers": {
-    "shell-proxy": {
-      "command": "$WORKFLOW_CLI_CMD",
-      "args": [
-        "mcp",
-        "--shell-proxy"
-      ],
-      "description": "Token-efficient shell proxy — wf_state, wf_git, wf_step_context, wf_files, wf_read, wf_env. Replaces bash reads with structured cached JSON. Use BEFORE any bash command."
-    },
-    "flowctl-state": {
-      "command": "$WORKFLOW_CLI_CMD",
-      "args": [
-        "mcp",
-        "--workflow-state"
-      ],
-      "description": "Workflow state tracker — flow_get_state, flow_advance_step, flow_request_approval, flow_add_blocker, flow_add_decision"
-    }
-  }
-}
-EOF
-    if [[ "$had_mcp" == "true" ]]; then
-      mcp_status="overwritten"
+  local merge_py="$WORKFLOW_ROOT/scripts/merge_cursor_mcp.py"
+  if [[ ! -f "$merge_py" ]]; then
+    wf_error "Không tìm thấy merge MCP: $merge_py"
+    exit 1
+  fi
+  local py_out="" merge_rc=0
+  if [[ "$overwrite_existing" == "true" ]]; then
+    py_out="$(python3 "$merge_py" --overwrite --scaffold "$WORKFLOW_CLI_CMD" "$PROJECT_ROOT/.cursor/mcp.json" 2>&1)" || merge_rc=$?
+  else
+    py_out="$(python3 "$merge_py" --scaffold "$WORKFLOW_CLI_CMD" "$PROJECT_ROOT/.cursor/mcp.json" 2>&1)" || merge_rc=$?
+  fi
+  if [[ "$merge_rc" -eq 2 ]]; then
+    wf_warn ".cursor/mcp.json: JSON không hợp lệ hoặc mcpServers sai kiểu — sửa tay hoặc chạy ${WORKFLOW_CLI_CMD} init --overwrite"
+    mcp_status="invalid_json"
+  elif [[ "$merge_rc" -ne 0 ]]; then
+    if [[ "$py_out" == *"PermissionError"* && "$py_out" == *".cursor/mcp.json"* ]]; then
+      wf_warn ".cursor/mcp.json: không có quyền ghi trong môi trường hiện tại — bỏ qua merge MCP cho lần chạy này"
+      mcp_status="skipped_permission_denied"
     else
-      mcp_status="created"
+      wf_error "merge_cursor_mcp.py thất bại (exit $merge_rc)"
+      exit 1
     fi
+  else
+    case "$py_out" in
+      MCP_STATUS=created)     mcp_status="created" ;;
+      MCP_STATUS=overwritten) mcp_status="overwritten" ;;
+      MCP_STATUS=merged)      mcp_status="merged" ;;
+      MCP_STATUS=unchanged)  mcp_status="unchanged" ;;
+      *) mcp_status="updated" ;;
+    esac
   fi
 
   if [[ -f "$WORKFLOW_ROOT/.claude/settings.json" ]]; then
@@ -168,7 +168,7 @@ EOF
   wf_info "Scaffold status:"
   [[ "$state_status" == "created" || "$state_status" == "overwritten" ]] && \
     wf_success "flowctl-state.json: $state_status" || wf_warn "flowctl-state.json: $state_status"
-  [[ "$mcp_status" == "created" || "$mcp_status" == "overwritten" ]] && \
+  [[ "$mcp_status" == "created" || "$mcp_status" == "overwritten" || "$mcp_status" == "merged" || "$mcp_status" == "unchanged" || "$mcp_status" == "skipped_permission_denied" ]] && \
     wf_success ".cursor/mcp.json: $mcp_status" || wf_warn ".cursor/mcp.json: $mcp_status"
   [[ "$settings_status" == "created" || "$settings_status" == "overwritten" ]] && \
     wf_success ".claude/settings.json: $settings_status" || wf_warn ".claude/settings.json: $settings_status"
@@ -199,10 +199,13 @@ cmd_mcp() {
 cmd_init() {
   local project_name=""
   local overwrite_existing="false"
+  local run_setup="true"
+  [[ "${FLOWCTL_SKIP_SETUP:-}" == "1" ]] && run_setup="false"
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --project) project_name="$2"; shift 2 ;;
       --overwrite|--force) overwrite_existing="true"; shift ;;
+      --no-setup) run_setup="false"; shift ;;
       *) shift ;;
     esac
   done
@@ -231,12 +234,27 @@ with open('$STATE_FILE', 'w') as f:
     json.dump(data, f, indent=2, ensure_ascii=False)
 "
 
+  if [[ "$run_setup" == "true" ]]; then
+    local setup_script="$WORKFLOW_ROOT/scripts/setup.sh"
+    if [[ ! -f "$setup_script" ]]; then
+      wf_warn "Không tìm thấy setup: $setup_script (bỏ qua)"
+    else
+      wf_info "Chạy setup (Graphify, MCP, .gitignore)..."
+      if FLOWCTL_PROJECT_ROOT="$PROJECT_ROOT" bash "$setup_script"; then
+        wf_success "Setup hoàn tất."
+      else
+        wf_warn "setup.sh thoát không thành công — chạy lại: FLOWCTL_PROJECT_ROOT=\"$PROJECT_ROOT\" bash \"$setup_script\""
+      fi
+    fi
+  fi
+
   echo ""
   wf_success "Project \"$project_name\" đã được khởi tạo."
   wf_info "Step hiện tại: 1 — Requirements Analysis"
   wf_info "Agent cần dùng: @pm (hỗ trợ: @tech-lead)"
   wf_info "Bước tiếp theo: ${WORKFLOW_CLI_CMD} start"
   wf_warn "Ghi đè scaffold chỉ khi thật sự cần: ${WORKFLOW_CLI_CMD} init --overwrite --project \"$project_name\""
+  [[ "$run_setup" == "false" ]] && wf_info "Đã bỏ qua setup (dùng --no-setup hoặc FLOWCTL_SKIP_SETUP=1)."
   echo ""
 }
 
@@ -674,7 +692,7 @@ case "$CMD" in
   help|--help|-h)
     echo ""
     wf_info "IT Product Workflow CLI"
-    echo -e "  init --project \"Name\"  Khởi tạo dự án mới"
+    echo -e "  init --project \"Name\" [--no-setup]  Khởi tạo dự án (+ setup mặc định)"
     echo -e "  status                 Xem trạng thái"
     echo -e "  start                  Bắt đầu step hiện tại"
     echo -e "  monitor [--once] [--interval=N]"

@@ -53,7 +53,7 @@ echo "- Repo: \`$REPO_ROOT\`" >> "$SUMMARY_FILE"
 echo "- Timestamp: \`$STAMP\`" >> "$SUMMARY_FILE"
 echo "" >> "$SUMMARY_FILE"
 
-run_cmd "Initialize flowctl" bash "$WORKFLOW_SCRIPT" init --project "E2E Skill Validation"
+run_cmd "Initialize flowctl" bash "$WORKFLOW_SCRIPT" init --no-setup --project "E2E Skill Validation"
 STATUS_OUTPUT="$(bash "$WORKFLOW_SCRIPT" status)"
 echo "$STATUS_OUTPUT" | tee -a "$LOG_FILE" >/dev/null
 assert_contains "Step 1" "$STATUS_OUTPUT" "status after init"

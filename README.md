@@ -28,10 +28,10 @@ CLI điều phối quy trình làm việc theo step cho team sản phẩm/kỹ t
 ## Cài đặt local
 
 ```bash
-# trong repo
-bash setup.sh
+# trong repo (cùng thư mục project cần setup)
+bash scripts/setup.sh
 
-# khởi tạo flow mới
+# khởi tạo flow mới (mặc định chạy setup luôn; CI: FLOWCTL_SKIP_SETUP=1 hoặc --no-setup)
 flowctl init --project "Tên dự án"
 ```
 
@@ -81,7 +81,7 @@ Ví dụ `.cursor/mcp.json`:
 
 ### Lifecycle cơ bản
 
-- `flowctl init --project "Name"`: khởi tạo state/scaffold.
+- `flowctl init --project "Name"`: khởi tạo state/scaffold và chạy `scripts/setup.sh` (Graphify/MCP). Thêm `--no-setup` hoặc `FLOWCTL_SKIP_SETUP=1` để bỏ qua. `.cursor/mcp.json` được **merge** (chỉ thêm server flowctl còn thiếu) trừ khi `--overwrite`; JSON lỗi sẽ được cảnh báo và gợi ý `--overwrite`.
 - `flowctl status`: xem trạng thái hiện tại.
 - `flowctl start`: bắt đầu step hiện tại.
 - `flowctl summary`: tóm tắt step.
@@ -205,5 +205,5 @@ flowctl retro
 - Khi thêm command mới, cập nhật cả:
   - help text trong `scripts/flowctl.sh`
   - `README.md`
-  - (nếu cần) template `.cursor/mcp.json` trong `setup.sh`
+  - (nếu cần) template `.cursor/mcp.json` trong `scripts/setup.sh`
 

@@ -7,3 +7,7 @@ __pycache__/
 
 !/.github/workflows/
 !/.github/workflows/*.yml
+.gitnexus
+
+.cursor/debug-ac4b33.log
+graphify-out/

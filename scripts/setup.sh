@@ -2,7 +2,12 @@
 # ============================================================
 # IT Product Team Workflow — Auto Setup
 # Cài đặt Graphify, GitNexus và cấu hình MCP servers
-# Chạy: bash setup.sh [--mcp-only | --index-only]
+#
+# Chạy:
+#   cd /path/to/project && bash /path/to/flowctl/scripts/setup.sh [--mcp-only | --index-only]
+# Hoặc đặt FLOWCTL_PROJECT_ROOT=/path/to/project (không cần cd).
+#
+# flowctl init gọi script này với FLOWCTL_PROJECT_ROOT (merge MCP, không ghi đè servers lạ).
 # ============================================================
 
 set -euo pipefail
@@ -16,12 +21,13 @@ info() { echo -e "${CYAN}[→]${NC} $*"; }
 warn() { echo -e "${YELLOW}[!]${NC} $*"; }
 err()  { echo -e "${RED}[✗]${NC} $*"; exit 1; }
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODE="${1:-all}"
+REPO_ROOT="${FLOWCTL_PROJECT_ROOT:-$PWD}"
 
 echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BLUE}   IT Product Team Workflow — Setup Script${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+info "Project root: $REPO_ROOT"
 
 # ── 1. Check prerequisites ───────────────────────────────────
 check_prerequisites() {
@@ -96,47 +102,24 @@ configure_cursor_mcp() {
   CURSOR_DIR="$REPO_ROOT/.cursor"
   mkdir -p "$CURSOR_DIR"
 
-  # Chỉ ghi nếu chưa có hoặc user dùng --mcp-only
-  if [[ -f "$CURSOR_DIR/mcp.json" && "$MODE" != "--mcp-only" ]]; then
-    warn ".cursor/mcp.json đã tồn tại (skip). Dùng --mcp-only để force ghi đè"
+  local merge_py merge_rc=0 py_out
+  merge_py="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/merge_cursor_mcp.py"
+  [[ -f "$merge_py" ]] || err "Không tìm thấy $merge_py"
+
+  py_out="$(python3 "$merge_py" --setup "$CURSOR_DIR/mcp.json")" || merge_rc=$?
+  if [[ "$merge_rc" -eq 2 ]]; then
+    warn ".cursor/mcp.json không đọc được (JSON lỗi) — sửa tay hoặc chạy flowctl init --overwrite rồi chạy lại setup"
     return 0
   fi
+  [[ "$merge_rc" -eq 0 ]] || err "merge_cursor_mcp.py thất bại (exit $merge_rc)"
 
-  cat > "$CURSOR_DIR/mcp.json" << 'EOF'
-{
-  "mcpServers": {
-    "graphify": {
-      "command": "python3",
-      "args": ["-m", "graphify.serve", "--root", "."],
-      "env": {
-        "GRAPHIFY_GRAPH_PATH": ".graphify/graph.json",
-        "GRAPHIFY_AUTO_INDEX": "true"
-      },
-      "description": "Codebase knowledge graph — hiểu cấu trúc, dependencies, clusters"
-    },
-    "gitnexus": {
-      "command": "npx",
-      "args": ["gitnexus", "--mcp", "--repo", "."],
-      "env": {
-        "GITNEXUS_AUTO_INDEX": "true"
-      },
-      "description": "Code intelligence engine — 16 MCP tools, git diff awareness"
-    },
-    "flowctl-state": {
-      "command": "flowctl",
-      "args": ["mcp", "--workflow-state"],
-      "description": "Workflow state tracker — current step, approvals, blockers"
-    },
-    "shell-proxy": {
-      "command": "flowctl",
-      "args": ["mcp", "--shell-proxy"],
-      "description": "Token-efficient shell proxy — wf_state, wf_git, wf_step_context, wf_files, wf_read, wf_env"
-    }
-  }
-}
-EOF
-
-  log ".cursor/mcp.json đã được tạo"
+  case "$py_out" in
+    MCP_STATUS=created)     log ".cursor/mcp.json đã tạo mới" ;;
+    MCP_STATUS=overwritten) log ".cursor/mcp.json đã ghi đè (template setup)" ;;
+    MCP_STATUS=merged)      log ".cursor/mcp.json đã merge (thêm server còn thiếu)" ;;
+    MCP_STATUS=unchanged)   log ".cursor/mcp.json đã đồng bộ (không thiếu server flowctl)" ;;
+    *) log ".cursor/mcp.json đã cập nhật" ;;
+  esac
 }
 
 # ── 6. Tạo .gitignore entries ────────────────────────────────

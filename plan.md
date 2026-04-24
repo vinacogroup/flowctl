@@ -92,9 +92,9 @@ Build a step-based agent orchestration flow where:
 - Controlled bypass (exception only):
   - `flowctl approve --skip-gate --by "Your Name"`
 - Run TDD regression suite before major refactor:
-  - `bash scripts/test-flowctl-tdd-regression.sh`
+  - `bash test/test-workflow-tdd-regression.sh`
 - Run chaos reliability suite for orchestration failure modes:
-  - `bash scripts/test-flowctl-chaos.sh`
+  - `bash test/test-workflow-chaos.sh`
 - Manual breaker recovery path:
   - `flowctl team budget-reset --reason "manual recovery"`
 - Update role policy guardrails:

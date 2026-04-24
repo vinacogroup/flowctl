@@ -14,6 +14,7 @@ Biến project hiện tại thành một CLI có thể cài đặt global để 
    - `.cursor/`
    - `.claude/`
    - `flowctl-state.json`
+   - (mặc định) chạy `scripts/setup.sh` trên `PROJECT_ROOT` (Graphify/MCP/.gitignore); có `--no-setup` / `FLOWCTL_SKIP_SETUP=1` để tắt.
 3. `init` có tính idempotent:
    - Không ghi đè file người dùng đã chỉnh nếu không có cờ explicit.
    - Có thông báo rõ file nào được tạo/bỏ qua.

@@ -113,7 +113,7 @@ PY
 log "# TDD Regression Run ($STAMP)"
 log "repo=$REPO_ROOT"
 
-expect_success "Initialize isolated test flowctl" bash "$WORKFLOW" init --project "TDD Regression"
+expect_success "Initialize isolated test flowctl" bash "$WORKFLOW" init --no-setup --project "TDD Regression"
 python3 - <<PY
 import json
 from pathlib import Path

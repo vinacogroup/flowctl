@@ -69,7 +69,7 @@ assert_contains() {
 log "# Chaos Suite Run ($STAMP)"
 log "repo=$REPO_ROOT"
 
-expect_success "Initialize flowctl baseline" bash "$WORKFLOW" init --project "Chaos Regression"
+expect_success "Initialize flowctl baseline" bash "$WORKFLOW" init --no-setup --project "Chaos Regression"
 expect_success "Start step 1 baseline" bash "$WORKFLOW" start
 
 REPORT_DIR="$REPO_ROOT/workflows/dispatch/step-1/reports"

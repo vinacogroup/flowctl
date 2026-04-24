@@ -439,7 +439,7 @@ cmd_brainstorm() {
     local effective_project="$project_name"
     [[ -z "$effective_project" ]] && effective_project="Auto Brainstorm Project"
     echo -e "${CYAN}Workflow chưa init, tự khởi tạo project: ${BOLD}${effective_project}${NC}"
-    cmd_init --project "$effective_project"
+    cmd_init --no-setup --project "$effective_project"
     step=$(wf_json_get "current_step")
   fi
 

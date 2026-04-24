@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// setup-git-hooks.mjs — Install git hooks for cache invalidation
-// Run once: node scripts/setup-git-hooks.mjs
+// setup-git-hooks.mjs — Install git hooks for governance and cache invalidation
+// Run once: node scripts/hooks/setup-git-hooks.mjs
 
 import { writeFileSync, chmodSync, existsSync, mkdirSync } from 'fs';
 import { join, resolve } from 'path';
@@ -13,6 +13,19 @@ if (!existsSync(GIT_HOOKS)) {
   console.error('Not a git repo or .git/hooks missing');
   process.exit(1);
 }
+
+// pre-commit: block commits on protected branches
+const preCommit = `#!/usr/bin/env bash
+bash "$(git rev-parse --show-toplevel)/scripts/hooks/prevent-main-commit.sh"
+`;
+
+// pre-push: block pushes on protected branches and run local quality gate
+const prePush = `#!/usr/bin/env bash
+set -euo pipefail
+repo_root="$(git rev-parse --show-toplevel)"
+bash "$repo_root/scripts/hooks/prevent-main-push.sh"
+bash "$repo_root/scripts/hooks/run-quality-gate.sh" --mode local
+`;
 
 // post-commit: invalidate git cache after every commit
 const postCommit = `#!/usr/bin/env bash
@@ -31,6 +44,8 @@ bash "$(git rev-parse --show-toplevel)/scripts/hooks/invalidate-cache.sh" git 2>
 `;
 
 const hooks = {
+  'pre-commit':   preCommit,
+  'pre-push':     prePush,
   'post-commit':   postCommit,
   'post-merge':    postMerge,
   'post-checkout': postCheckout,

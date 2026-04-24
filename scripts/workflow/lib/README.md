@@ -45,4 +45,4 @@ This folder contains modular building blocks for the flowctl engine.
 
 Run regression suite after every structural change:
 
-`bash scripts/test-flowctl-tdd-regression.sh`
+`bash test/test-workflow-tdd-regression.sh`
