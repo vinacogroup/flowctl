@@ -19,6 +19,8 @@ jobs:
           node-version: 20
           registry-url: https://npm.pkg.github.com
       - run: npm ci
+      # Use the job token (not a repo secret named GITHUB_*). With packages:write
+      # this can publish to npm.pkg.github.com for this repository's packages.
       - run: npm publish --ignore-scripts
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
