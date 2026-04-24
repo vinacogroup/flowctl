@@ -399,6 +399,8 @@ def render_ansi():
 # ── Main ──────────────────────────────────────────────────────
 
 def main():
+    if "--once" not in sys.argv:
+        print("[Deprecated] Use 'flowctl monitor' for web dashboard. This TUI is available via 'flowctl monitor --tui'.", file=sys.stderr)
     for arg in sys.argv[1:]:
         if arg == "--once": _interval_ref[0] = 0
         elif arg.startswith("--interval="):

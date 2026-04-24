@@ -1,12 +1,12 @@
 {
   "_comment": "flowctl state machine template (same schema as workflow-state)",
   "version": "1.0.0",
-  "project_name": "",
+  "project_name": "TDD Regression",
   "project_description": "",
-  "created_at": "",
-  "updated_at": "2026-04-24 16:21:02",
-  "current_step": 6,
-  "overall_status": "not_started",
+  "created_at": "2026-04-24 16:36:22",
+  "updated_at": "2026-04-24 17:06:47",
+  "current_step": 9,
+  "overall_status": "in_progress",
   "steps": {
     "1": {
       "name": "Requirements Analysis",
@@ -14,36 +14,40 @@
       "support_agents": [
         "tech-lead"
       ],
-      "status": "completed",
-      "started_at": "2026-04-24 08:48:46",
-      "completed_at": "2026-04-24 13:34:49",
-      "approved_at": "2026-04-24 13:34:49",
-      "approved_by": "PM",
-      "approval_status": "approved",
+      "status": "in_progress",
+      "started_at": "2026-04-24 16:36:22",
+      "completed_at": null,
+      "approved_at": null,
+      "approved_by": null,
+      "approval_status": null,
       "graphify_snapshot": null,
       "deliverables": [
         "workflows/dispatch/step-1/reports/pm-report.md — Worker report",
-        "workflows/dispatch/step-1/reports/tech-lead-report.md — Worker report"
+        "docs/requirements.md",
+        "workflows/dispatch/step-1/reports/tech-lead-report.md — Worker report",
+        "docs/architecture.md"
       ],
       "blockers": [
         {
-          "id": "B20260424132732",
-          "description": "Graphify graph unavailable: graphify-out/graph.json missing; cannot run live graphify_update_node for step-1 PM.",
-          "created_at": "2026-04-24 13:27:32",
-          "resolved": true,
-          "resolved_at": "2026-04-24 13:32:05"
+          "id": "B20260424163627349252",
+          "description": "Need confidence threshold from tech-lead.",
+          "created_at": "2026-04-24 16:36:27",
+          "resolved": false,
+          "source": "workflows/dispatch/step-1/reports/pm-report.md"
         }
       ],
       "decisions": [
         {
-          "id": "D20260424132656",
-          "description": "Step 1 adopts init/setup requirements baseline from plan 260424; prioritize MCP merge-safe behavior and explicit setup guidance.",
-          "date": "2026-04-24"
+          "id": "D20260424163627348848",
+          "description": "Keep PM gateway model.",
+          "date": "2026-04-24",
+          "source": "workflows/dispatch/step-1/reports/pm-report.md"
         },
         {
-          "id": "D20260424132656",
-          "description": "Graphify source graph unavailable (graphify-out/graph.json missing); use context-digest + plan fallback for this run.",
-          "date": "2026-04-24"
+          "id": "D20260424163627349654",
+          "description": "Use depth limit=3 for delegation.",
+          "date": "2026-04-24",
+          "source": "workflows/dispatch/step-1/reports/tech-lead-report.md"
         }
       ],
       "notes": ""
@@ -157,16 +161,26 @@
         "backend",
         "frontend"
       ],
-      "status": "in_progress",
+      "status": "completed",
       "started_at": "2026-04-24 16:21:02",
-      "completed_at": null,
-      "approved_at": null,
-      "approved_by": null,
-      "approval_status": null,
+      "completed_at": "2026-04-24 16:29:47",
+      "approved_at": "2026-04-24 16:29:47",
+      "approved_by": "PM",
+      "approval_status": "approved",
       "graphify_snapshot": null,
-      "deliverables": [],
+      "deliverables": [
+        "workflows/dispatch/step-6/reports/backend-report.md — Worker report",
+        "workflows/dispatch/step-6/reports/frontend-report.md — Worker report",
+        "workflows/dispatch/step-6/reports/tech-lead-report.md — Worker report"
+      ],
       "blockers": [],
-      "decisions": [],
+      "decisions": [
+        {
+          "id": "D20260424162703",
+          "description": "Step 6 tech-lead executed layered context loading; Graphify/GitNexus CLI unavailable in runtime, fallback to context-digest plus state reports accepted for integration sign-off.",
+          "date": "2026-04-24"
+        }
+      ],
       "notes": ""
     },
     "7": {
@@ -177,14 +191,19 @@
         "frontend",
         "devops"
       ],
-      "status": "pending",
-      "started_at": null,
-      "completed_at": null,
-      "approved_at": null,
-      "approved_by": null,
-      "approval_status": null,
+      "status": "completed",
+      "started_at": "2026-04-24 16:30:56",
+      "completed_at": "2026-04-24 16:52:03",
+      "approved_at": "2026-04-24 16:52:03",
+      "approved_by": "PM",
+      "approval_status": "approved",
       "graphify_snapshot": null,
-      "deliverables": [],
+      "deliverables": [
+        "workflows/dispatch/step-7/reports/backend-report.md — Worker report",
+        "workflows/dispatch/step-7/reports/devops-report.md — Worker report",
+        "workflows/dispatch/step-7/reports/frontend-report.md — Worker report",
+        "workflows/dispatch/step-7/reports/qa-report.md — Worker report"
+      ],
       "blockers": [],
       "decisions": [],
       "notes": ""
@@ -195,14 +214,17 @@
       "support_agents": [
         "tech-lead"
       ],
-      "status": "pending",
-      "started_at": null,
-      "completed_at": null,
-      "approved_at": null,
-      "approved_by": null,
-      "approval_status": null,
+      "status": "completed",
+      "started_at": "2026-04-24 16:52:28",
+      "completed_at": "2026-04-24 17:00:21",
+      "approved_at": "2026-04-24 17:00:21",
+      "approved_by": "PM",
+      "approval_status": "approved",
       "graphify_snapshot": null,
-      "deliverables": [],
+      "deliverables": [
+        "workflows/dispatch/step-8/reports/devops-report.md — Worker report",
+        "workflows/dispatch/step-8/reports/tech-lead-report.md — Worker report"
+      ],
       "blockers": [],
       "decisions": [],
       "notes": ""
@@ -215,14 +237,19 @@
         "qa",
         "devops"
       ],
-      "status": "pending",
-      "started_at": null,
+      "status": "in_progress",
+      "started_at": "2026-04-24 17:00:52",
       "completed_at": null,
       "approved_at": null,
       "approved_by": null,
       "approval_status": null,
       "graphify_snapshot": null,
-      "deliverables": [],
+      "deliverables": [
+        "workflows/dispatch/step-9/reports/devops-report.md — Worker report",
+        "workflows/dispatch/step-9/reports/pm-report.md — Worker report",
+        "workflows/dispatch/step-9/reports/qa-report.md — Worker report",
+        "workflows/dispatch/step-9/reports/tech-lead-report.md — Worker report"
+      ],
       "blockers": [],
       "decisions": [],
       "notes": ""
@@ -238,8 +265,8 @@
     "total_changes_tracked": 0
   },
   "metrics": {
-    "total_blockers": 1,
-    "total_decisions": 3,
+    "total_blockers": 2,
+    "total_decisions": 6,
     "steps_completed": 0,
     "on_schedule": true
   },
