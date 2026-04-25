@@ -2,9 +2,14 @@
 """
 PostToolUse hook — Detect expensive bash commands, log as waste events.
 Receives JSON on stdin from Claude Code hooks system.
+
+Architecture note:
+  This hook is the DETECTION layer (fires after bash runs, logs waste).
+  shell-proxy.js is the PREVENTION layer (agents call wf_* tools instead of bash).
+  Together they give full visibility: proxy tracks savings, hook tracks leakage.
 """
 
-import json, sys, os, re
+import json, sys, re
 from pathlib import Path
 from datetime import datetime
 
@@ -12,19 +17,23 @@ REPO    = Path(__file__).resolve().parent.parent.parent
 EVENTS  = REPO / ".cache" / "mcp" / "events.jsonl"
 STATS_F = REPO / ".cache" / "mcp" / "session-stats.json"
 
-# Commands that should be replaced with MCP tools
+# (pattern, mcp_alternative, mcp_alt_tokens)
+# mcp_alt_tokens = expected token cost of the MCP tool output.
+# Must stay in sync with BASH_EQUIV in scripts/workflow/mcp/shell-proxy.js:
+#   bash_equiv is what bash costs; mcp_alt_tokens is what MCP costs.
+#   waste = output_tokens - mcp_alt_tokens
 WASTEFUL_PATTERNS = [
-    (r"git\s+log",           "wf_git()",          250),
-    (r"git\s+status",        "wf_git()",          180),
-    (r"git\s+diff",          "wf_git()",          300),
-    (r"git\s+branch",        "wf_git()",          100),
-    (r"cat\s+flowctl-state","wf_state()",        480),
-    (r"cat\s+.*\.json",      "wf_read(path)",     300),
-    (r"ls\s+-la?",           "wf_files()",        120),
-    (r"find\s+\.",           "wf_files()",        200),
-    (r"wc\s+-l",             "wf_read(path)",      80),
-    (r"python3.*flowctl-state", "wf_state()",    480),
-    (r"bash\s+scripts/flowctl\.sh\s+status", "wf_state()", 300),
+    (r"git\s+log",                           "wf_git()",        110),
+    (r"git\s+status",                        "wf_git()",        110),
+    (r"git\s+diff",                          "wf_git()",        110),
+    (r"git\s+branch",                        "wf_git()",        110),
+    (r"cat\s+flowctl-state",                 "wf_state()",       95),
+    (r"cat\s+.*\.json",                      "wf_read(path)",   400),
+    (r"ls\s+-la?",                           "wf_files()",       90),
+    (r"find\s+\.",                           "wf_files()",       90),
+    (r"wc\s+-l",                             "wf_read(path)",   400),
+    (r"python3.*flowctl-state",              "wf_state()",       95),
+    (r"bash\s+scripts/flowctl\.sh\s+status", "wf_state()",       95),
 ]
 
 def estimate_tokens(text: str) -> int:
@@ -83,23 +92,25 @@ def main():
     output_tokens = estimate_tokens(output)
 
     # Check for wasteful patterns
-    suggestion = None
-    waste_tokens = 0
-    for pattern, alt, baseline_tok in WASTEFUL_PATTERNS:
+    suggestion     = None
+    waste_tokens   = 0
+    mcp_alt_tokens = 0
+    for pattern, alt, mcp_tok in WASTEFUL_PATTERNS:
         if re.search(pattern, command, re.IGNORECASE):
-            waste_tokens = max(0, output_tokens - 80)  # MCP alt ≈ 80 tokens
-            suggestion   = alt
+            mcp_alt_tokens = mcp_tok
+            waste_tokens   = max(0, output_tokens - mcp_alt_tokens)
+            suggestion     = alt
             break
 
     if waste_tokens > 0:
-        # Print warning to stderr (visible in terminal but not injected into agent context)
+        # Print warning to stderr (visible in terminal, not injected into agent context)
         short_cmd = command[:60] + "…" if len(command) > 60 else command
         sys.stderr.write(
             f"\n⚠️  TOKEN WASTE DETECTED\n"
-            f"   Command  : {short_cmd}\n"
-            f"   Est. cost: ~{output_tokens:,} tokens\n"
-            f"   Use instead: {suggestion} (~80 tokens)\n"
-            f"   Wasted   : ~{waste_tokens:,} tokens\n\n"
+            f"   Command    : {short_cmd}\n"
+            f"   Bash cost  : ~{output_tokens:,} tokens\n"
+            f"   Use instead: {suggestion} (~{mcp_alt_tokens} tokens)\n"
+            f"   Wasted     : ~{waste_tokens:,} tokens\n\n"
         )
         sys.stderr.flush()
 

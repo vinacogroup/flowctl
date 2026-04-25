@@ -1,0 +1,13 @@
+# flowctl: exclude workflow/config files from code graph
+CLAUDE.md
+AGENTS.md
+*.md
+.cursor/
+workflows/
+plans/
+graphify-out/
+scripts/
+*.sh
+*.json
+*.yaml
+*.yml

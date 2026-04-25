@@ -26,6 +26,19 @@ const STATE       = join(REPO, 'flowctl-state.json');
 // Anthropic Sonnet 4.6 pricing (per 1M tokens)
 const PRICE = { input: 3.0, output: 15.0 };
 
+// Bash-equivalent token cost for each tool — what an agent would consume
+// if it used raw bash commands instead of this MCP proxy.
+// These are conservative estimates based on real command output sizes.
+const BASH_EQUIV = {
+  wf_state:          1900, // cat flowctl-state.json (~1600) + flowctl status (~300)
+  wf_git:            1000, // git log --oneline -5 + git status --short + git diff --stat
+  wf_step_context:   4800, // reading state + context-digest + war-room + blockers (5+ files)
+  wf_files:           500, // ls -la + find . -maxdepth 2
+  wf_read:            700, // cat <file> raw (uncompressed, full content)
+  wf_env:             300, // node/npm/python/git --version + uname commands
+  wf_reports_status:  600, // ls reports/ + reading 2-3 report files for status
+};
+
 // Per-connection agent context (parallel subagents = parallel connections)
 let connectionAgent = 'unknown';
 
@@ -186,19 +199,20 @@ function withLogging(toolName, fn) {
     const outputStr = JSON.stringify(result);
     const outputTokens = estimateTokens(outputStr);
 
-    let savedTokens = 0;
-    let savedUsd = 0;
+    // Savings = what bash would have cost minus what MCP actually costs.
+    // Applies on EVERY call (hit or miss) because the compact output is always
+    // smaller than raw bash output regardless of caching.
+    // Cache hits save additional latency but not additional tokens vs a miss.
+    const bashEquiv  = BASH_EQUIV[toolName] ?? outputTokens * 2;
+    const savedTokens = Math.max(0, bashEquiv - outputTokens);
+    const savedUsd    = costUsd(savedTokens, 0);
+    const costUsdVal  = costUsd(inputTokens, outputTokens);
 
-    if (isHit) {
-      const baseline = getBaseline(toolName);
-      savedTokens = Math.max(0, baseline - outputTokens);
-      savedUsd    = costUsd(savedTokens, 0);
-    } else {
-      // Cache miss: measure actual output, update baseline
+    if (!isHit) {
+      // Update baseline with actual MCP output size (informational, used for
+      // detecting if tool output grows unexpectedly over time).
       updateBaseline(toolName, outputTokens);
     }
-
-    const costUsdVal = costUsd(inputTokens, outputTokens);
 
     logEvent({
       type: 'mcp',
@@ -207,6 +221,7 @@ function withLogging(toolName, fn) {
       cache: isHit ? 'hit' : 'miss',
       input_tokens: inputTokens,
       output_tokens: outputTokens,
+      bash_equiv: bashEquiv,
       saved_tokens: savedTokens,
       cost_usd: costUsdVal,
       saved_usd: savedUsd,
@@ -484,7 +499,10 @@ function tool_cache_stats() {
     total_cost_usd: Number((stats.total_cost_usd || 0).toFixed(4)),
     total_saved_usd: Number((stats.total_saved_usd || 0).toFixed(4)),
     bash_waste_tokens: stats.bash_waste_tokens || 0,
-    efficiency_pct: stats.total_consumed_tokens ? Math.round(stats.total_saved_tokens / (stats.total_consumed_tokens + stats.total_saved_tokens) * 100) : 0,
+    // efficiency = saved / (saved + consumed) — what fraction of potential cost we avoided
+    efficiency_pct: (stats.total_saved_tokens || 0) + (stats.total_consumed_tokens || 0) > 0
+      ? Math.round((stats.total_saved_tokens || 0) / ((stats.total_saved_tokens || 0) + (stats.total_consumed_tokens || 0)) * 100)
+      : 0,
     tools: toolStats,
   };
 }

@@ -91,6 +91,23 @@ def check_alerts(stats, events):
         alerts.append(f"High bash waste recently: ~{waste:,} tok - use MCP tools instead")
     return alerts
 
+def build_calls_log(events, last_n=40):
+    """Individual proxy call log — newest first."""
+    mcp_events = [e for e in events if e.get("type") == "mcp"]
+    result = []
+    for e in reversed(mcp_events[-last_n:]):
+        result.append({
+            "ts":         (e.get("ts",""))[11:19],   # HH:MM:SS
+            "tool":       e.get("tool","?"),
+            "cache":      e.get("cache","?"),         # "hit" | "miss"
+            "out_tok":    e.get("output_tokens", 0),
+            "bash_equiv": e.get("bash_equiv", 0),
+            "saved_tok":  e.get("saved_tokens", 0),
+            "dur_ms":     e.get("duration_ms", 0),
+            "agent":      e.get("agent","?"),
+        })
+    return result
+
 def build_api_data():
     """Build complete JSON payload for the dashboard."""
     stats  = load_stats()
@@ -129,6 +146,7 @@ def build_api_data():
         "duration":  session_duration(stats),
         "tools":     tools_data,
         "activity":  [compute_turn_summary(t) for t in turns[-10:]],
+        "calls":     build_calls_log(events),
         "alerts":    alerts,
         "ts":        datetime.now().strftime("%H:%M:%S"),
     }
@@ -212,6 +230,12 @@ tr:hover td{background:var(--elevated)}
 .hbar{display:inline-block;width:44px;height:3px;background:var(--elevated);border-radius:2px;vertical-align:middle;overflow:hidden}
 .hfill{height:100%;border-radius:2px;transition:width .5s}
 
+.calls-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:8px}
+.ptitle-sub{font-size:9px;font-weight:400;color:var(--muted);text-transform:lowercase;letter-spacing:.02em;margin-left:6px}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:.06em;line-height:1.4}
+.badge-hit{background:rgba(34,197,94,.12);color:var(--green)}
+.badge-miss{background:rgba(239,68,68,.10);color:var(--red)}
+.badge-unk{background:rgba(148,163,184,.1);color:var(--muted)}
 .alerts{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:9px 14px;transition:border-color .3s}
 .aok{color:var(--green);font-family:var(--mono);font-size:12px}
 .awarn{color:var(--amber);font-family:var(--mono);font-size:12px;margin-bottom:3px}
@@ -275,6 +299,15 @@ tr:hover td{background:var(--elevated)}
     <table><thead><tr><th>Time</th><th>Agent</th><th>Ops</th><th>Cost</th><th>Tok</th></tr></thead>
     <tbody id="act-body"><tr class="empty"><td colspan="5">No activity yet</td></tr></tbody></table>
   </div>
+</div>
+
+<div class="panel calls-panel">
+  <div class="ptitle">Proxy Call Log <span class="ptitle-sub">newest first · last 40</span></div>
+  <table><thead><tr>
+    <th>Time</th><th>Tool</th><th>Cache</th>
+    <th>Out&thinsp;tok</th><th>Bash&thinsp;equiv</th><th>Saved</th><th>ms</th>
+  </tr></thead>
+  <tbody id="calls-body"><tr class="empty"><td colspan="7">No proxy calls yet</td></tr></tbody></table>
 </div>
 
 <div class="alerts" id="alerts">
@@ -361,6 +394,33 @@ function renderActivity(activity) {
   });
 }
 
+function renderCalls(calls) {
+  const tbody = document.getElementById('calls-body');
+  if (!calls || !calls.length) {
+    tbody.innerHTML = '<tr class="empty"><td colspan="7">No proxy calls yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = '';
+  calls.forEach(c => {
+    const isHit  = c.cache === 'hit';
+    const isMiss = c.cache === 'miss';
+    const badgeCls = isHit ? 'badge-hit' : isMiss ? 'badge-miss' : 'badge-unk';
+    const badgeTxt = isHit ? 'HIT' : isMiss ? 'MISS' : esc(c.cache).toUpperCase();
+    const savedCls = c.saved_tok > 0 ? 'c-green' : 'c-muted';
+    const row = document.createElement('tr');
+    row.innerHTML = [
+      `<td class="c-muted">${esc(c.ts)}</td>`,
+      `<td class="c-blue">${esc(c.tool)}</td>`,
+      `<td><span class="badge ${badgeCls}">${badgeTxt}</span></td>`,
+      `<td class="c-muted">${esc(c.out_tok)}</td>`,
+      `<td class="c-muted">${esc(c.bash_equiv)}</td>`,
+      `<td class="${savedCls}">+${esc(fmt(c.saved_tok))}</td>`,
+      `<td class="c-muted">${esc(c.dur_ms)}</td>`,
+    ].join('');
+    tbody.appendChild(row);
+  });
+}
+
 function render(d) {
   set('hstep',  'Step ' + (d.step || '-'));
   set('hsname', d.step_name || '');
@@ -389,6 +449,7 @@ function render(d) {
 
   renderTools(d.tools);
   renderActivity(d.activity);
+  renderCalls(d.calls);
 
   const al = document.getElementById('alerts');
   if (!d.alerts || !d.alerts.length) {
