@@ -84,19 +84,22 @@ assert_keys "$MCP" shell-proxy flowctl-state
 assert_no_key "$MCP" acme
 python3 -c "import json;d=json.load(open('$MCP')); assert 'note' not in d" || fail "overwrite should drop extra top-level keys"
 
-# --- setup: merge adds graphify etc. ---
+# --- setup: merge adds gitnexus + flowctl servers (graphify has no MCP server) ---
 MCP="$TMP/setup.json"
 printf '%s\n' '{"mcpServers":{"shell-proxy":{"command":"flowctl","args":["mcp","--shell-proxy"]}}}' > "$MCP"
 out="$(run_merge --setup "$MCP")"
 assert_out "$out" "MCP_STATUS=merged" "setup merge partial"
-assert_keys "$MCP" shell-proxy graphify gitnexus flowctl-state
+assert_keys "$MCP" shell-proxy gitnexus flowctl-state
+# graphify is NOT included — it has no MCP server, agents read graph files directly
+python3 -c "import json;d=json.load(open('$MCP')); assert 'graphify' not in d['mcpServers'], 'graphify must NOT be in setup template'" \
+  || fail "setup template must not include graphify MCP entry"
 
 # --- setup: no mcpServers key merges template + keeps top ---
 printf '%s\n' '{"version":1}' > "$MCP"
 out="$(run_merge --setup "$MCP")"
 assert_out "$out" "MCP_STATUS=merged" "setup merge missing mcpServers"
-python3 -c "import json;d=json.load(open('$MCP')); assert d.get('version')==1 and 'graphify' in d['mcpServers']" \
-  || fail "setup should keep extra top-level keys"
+python3 -c "import json;d=json.load(open('$MCP')); assert d.get('version')==1 and 'gitnexus' in d['mcpServers'] and 'graphify' not in d['mcpServers']" \
+  || fail "setup should keep extra top-level keys and not include graphify"
 
 pass "merge_cursor_mcp scenarios (scaffold + setup)"
 exit 0

@@ -855,8 +855,15 @@ fetch('/api/data')
 #   • daemon_threads=True: SSE threads die automatically when the main thread exits
 
 class ThreadingHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
-    daemon_threads     = True   # background threads die when main thread exits
+    daemon_threads      = True   # background threads die when main thread exits
     allow_reuse_address = True
+
+    def handle_error(self, request, client_address):
+        """Suppress routine client-disconnect errors (browser refresh, tab close, etc.)."""
+        exc = sys.exc_info()[1]
+        if isinstance(exc, (ConnectionResetError, BrokenPipeError, ConnectionAbortedError)):
+            return  # Normal — not a server bug
+        super().handle_error(request, client_address)
 
 # -- HTTP handler --------------------------------------------------------------
 

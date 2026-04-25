@@ -220,6 +220,13 @@ cmd_init() {
     esac
   done
 
+  # Capture whether this is a brand-new project BEFORE scaffold writes the state file.
+  # Setup (Graphify, gitnexus, mcp.json) should only run on first init or explicit --overwrite.
+  # Re-running `flowctl init` on an existing project should NOT reinstall/re-index tools.
+  local is_new_project="false"
+  [[ ! -f "$STATE_FILE" ]] && is_new_project="true"
+  [[ "$overwrite_existing" == "true" ]] && is_new_project="true"
+
   ensure_project_scaffold "$overwrite_existing"
 
   [[ -z "$project_name" ]] && {
@@ -248,7 +255,7 @@ with open('$STATE_FILE', 'w') as f:
     json.dump(data, f, indent=2, ensure_ascii=False)
 "
 
-  if [[ "$run_setup" == "true" ]]; then
+  if [[ "$run_setup" == "true" && "$is_new_project" == "true" ]]; then
     local setup_script="$WORKFLOW_ROOT/scripts/setup.sh"
     if [[ ! -f "$setup_script" ]]; then
       wf_warn "Không tìm thấy setup: $setup_script (bỏ qua)"
@@ -260,6 +267,8 @@ with open('$STATE_FILE', 'w') as f:
         wf_warn "setup.sh thoát không thành công — chạy lại: FLOWCTL_PROJECT_ROOT=\"$PROJECT_ROOT\" bash \"$setup_script\""
       fi
     fi
+  elif [[ "$run_setup" == "true" && "$is_new_project" == "false" ]]; then
+    wf_info "Project đã tồn tại — bỏ qua setup (dùng --overwrite để chạy lại setup)."
   fi
 
   echo ""

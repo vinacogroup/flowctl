@@ -34,20 +34,31 @@ Chỉ dùng ở **steps 4-8** (Backend, Frontend, Integration, QA, DevOps) khi c
 
 ---
 
-## 2. MCP Tools (4 tools thực tế)
+## 2. Cách Dùng — Direct File Access (KHÔNG có MCP server)
 
-```
-query_graph(query, budget?)     — Hỏi về code structure bằng ngôn ngữ tự nhiên
-get_node(node_id)               — Chi tiết một node (functions, callers, callees)
-get_neighbors(node_id, depth?)  — Dependencies/dependents của node
-shortest_path(source, target)   — Đường ngắn nhất giữa 2 nodes
+Graphify **không** có MCP server. Đọc output files trực tiếp:
+
+```bash
+# Build graph (một lần sau khi clone / khi code thay đổi lớn)
+python3 -m graphify update .
+
+# Files output:
+#   graphify-out/graph.json       ← full graph: nodes, edges, clusters, call_graph
+#   graphify-out/GRAPH_REPORT.md  ← human-readable overview
 ```
 
-Ngoài ra (nếu có trong MCP server):
+**Đọc overview trước:**
+```bash
+cat graphify-out/GRAPH_REPORT.md   # clusters, top nodes, stats
 ```
-graph_stats()      — Thống kê: nodes, edges, communities
-god_nodes(limit?)  — Nodes có nhiều connections nhất (high-impact)
-get_community(id)  — Xem cluster code liên quan
+
+**Đọc graph data khi cần chi tiết:**
+```python
+import json
+graph = json.load(open("graphify-out/graph.json"))
+# graph["nodes"]   — dict of id → {name, type, file, line, ...}
+# graph["edges"]   — list of {source, target, type}
+# graph["clusters"] — list of related-code groups
 ```
 
 ---
@@ -64,46 +75,38 @@ Nếu `graph.json` chưa có: `python3 -m graphify update .`
 
 ---
 
-## 4. Query Patterns Theo Role
+## 4. Patterns Đọc Graph Theo Role
 
 ### Backend Dev (Step 4)
-```
-query_graph("database access patterns")
-query_graph("authentication middleware")
-query_graph("API request handling flow")
-get_neighbors("UserService")        ← upstream callers + downstream deps
-god_nodes(10)                       ← high-impact modules cần cẩn thận
-```
-
-### Frontend Dev (Step 5)
-```
-query_graph("component hierarchy")
-query_graph("state management patterns")
-query_graph("API integration layer")
-get_neighbors("AuthContext")        ← components using auth
+```python
+import json
+g = json.load(open("graphify-out/graph.json"))
+# Tìm nodes liên quan đến database/auth
+db_nodes = [n for n in g["nodes"].values() if "db" in n["name"].lower() or "repo" in n["name"].lower()]
+# Tìm edges gọi đến UserService
+user_callers = [e for e in g["edges"] if e["target"] == "UserService"]
 ```
 
-### Tech Lead / Integration (Steps 2, 6)
-```
-query_graph("service dependencies")
-query_graph("external integrations")
-shortest_path("UserController", "Database")   ← trace call path
-graph_stats()                                 ← codebase overview
-```
+### Tất cả roles
+```bash
+# Bước 1 — luôn đọc overview trước
+cat graphify-out/GRAPH_REPORT.md
 
-### QA (Step 7)
-```
-query_graph("API endpoints")
-query_graph("error handling paths")
-query_graph("authentication flow")
-get_neighbors("PaymentService")     ← integration test scope
-```
+# Bước 2 — tìm nodes theo tên/file
+python3 -c "
+import json
+g = json.load(open('graphify-out/graph.json'))
+keyword = 'auth'  # thay bằng keyword cần tìm
+hits = [n for n in g.get('nodes', {}).values() if keyword in n.get('name','').lower()]
+for h in hits[:10]: print(h.get('name'), '—', h.get('file',''))
+"
 
-### DevOps (Step 8)
-```
-query_graph("service entry points")
-query_graph("external service calls")
-god_nodes(5)                        ← critical services → deploy cẩn thận
+# Bước 3 — xem cluster (nhóm code liên quan)
+python3 -c "
+import json
+g = json.load(open('graphify-out/graph.json'))
+for c in g.get('clusters', [])[:5]: print(c)
+"
 ```
 
 ---

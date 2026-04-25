@@ -171,12 +171,8 @@ configure_cursor_mcp() {
     *) log ".cursor/mcp.json đã cập nhật" ;;
   esac
 
-  # Install graphify Cursor integration (adds MCP server entry for Cursor)
-  if python3 -c "import graphify" &>/dev/null 2>&1; then
-    python3 -m graphify cursor install 2>/dev/null \
-      && log "Graphify Cursor MCP đã cài" \
-      || warn "graphify cursor install thất bại — thêm thủ công nếu cần"
-  fi
+  # NOTE: Graphify has no MCP server. Agents read graphify-out/graph.json directly.
+  # Do NOT run `graphify cursor install` — that command doesn't exist or creates a wrong entry.
 }
 
 # ── 6. Tạo .gitignore entries ────────────────────────────────

@@ -103,27 +103,27 @@ wf_cache_invalidate(scope?)     — Invalidate cache (all|git|state|files)
 
 ---
 
-### Graphify Tools (code structure graph — steps 4-8 only)
+### Graphify (code structure graph — steps 4-8 only)
 
-MCP server: `graphify.serve` — 4 tools thực tế:
+**Graphify KHÔNG có MCP server.** Dùng trực tiếp qua CLI + file output:
+
+```bash
+# Build/rebuild graph (chạy từ project root)
+python3 -m graphify update .
+# Output:
+#   graphify-out/graph.json       ← full graph data (nodes, edges, calls)
+#   graphify-out/GRAPH_REPORT.md  ← overview: clusters, top nodes, stats
 ```
-query_graph(query, budget?)     — Hỏi về code structure bằng ngôn ngữ tự nhiên
-                                  Ví dụ: query_graph("show the auth flow")
-                                  KHÔNG dùng cho: requirements, decisions, blockers
-get_node(node_id)               — Lấy thông tin node code cụ thể
-get_neighbors(node_id, depth?)  — Lấy dependencies của một symbol/module
-shortest_path(source, target)   — Tìm đường ngắn nhất giữa 2 code nodes
-```
 
-**Workflow trước khi dùng:**
-1. Đọc `graphify-out/GRAPH_REPORT.md` để biết codebase đang index gì
-2. Dùng `query_graph()` cho câu hỏi về code structure (không phải workflow data)
-
-Rebuild graph: `python3 -m graphify update .` → output: `graphify-out/graph.json`
+**Workflow:**
+1. Kiểm tra `graphify-out/graph.json` tồn tại — nếu chưa: rebuild
+2. Đọc `graphify-out/GRAPH_REPORT.md` để có overview nhanh
+3. Đọc sections trong `graphify-out/graph.json` khi cần chi tiết node/dependency cụ thể
 
 **QUAN TRỌNG — Graphify chỉ chứa code structure:**
-- ✅ ĐÚNG: `query_graph("authentication flow")`, `query_graph("database schema")`
-- ❌ SAI: `query_graph("project:requirements")`, `query_graph("open:blockers")` — không tồn tại
+- ✅ ĐÚNG: đọc graph để hiểu authentication flow, database schema, module dependencies
+- ❌ SAI: query requirements, decisions, blockers — không tồn tại trong graph
+- ❌ SAI: `query_graph()`, `get_node()` — không phải MCP tools, không có server
 
 **Khi nào dùng:** Steps 4-8 (Backend, Frontend, Integration, QA, DevOps) khi cần hiểu code structure.
 **Workflow data** (decisions, blockers, step outcomes) → dùng `wf_step_context()` thay thế.
