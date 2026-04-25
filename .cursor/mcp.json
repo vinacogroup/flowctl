@@ -15,6 +15,28 @@
         "--workflow-state"
       ],
       "description": "Workflow state tracker — flow_get_state, flow_advance_step, flow_request_approval, flow_add_blocker, flow_add_decision"
+    },
+    "graphify": {
+      "command": "python3",
+      "args": [
+        "-m",
+        "graphify.serve",
+        "graphify-out/graph.json"
+      ],
+      "description": "Codebase knowledge graph — query_graph, get_node, get_neighbors, get_community, graph_stats. Rebuild: python3 -m graphify update ."
+    },
+    "gitnexus": {
+      "command": "npx",
+      "args": [
+        "gitnexus",
+        "--mcp",
+        "--repo",
+        "."
+      ],
+      "env": {
+        "GITNEXUS_AUTO_INDEX": "true"
+      },
+      "description": "Code intelligence engine — 16 MCP tools, git diff awareness"
     }
   }
 }

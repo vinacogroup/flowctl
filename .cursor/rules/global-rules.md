@@ -61,89 +61,41 @@ EVIDENCE: figma_url — https://figma.com/...
 
 ## 2. Quy Tắc Sử Dụng Graphify
 
-> **⚠️ Lazy loading rule**: Chỉ query Graphify khi graph có data (> 10 nodes). Nếu graph trống
-> hoặc sparse → bỏ qua Layer 1, đọc file trực tiếp. Dùng `flowctl audit-tokens` để kiểm tra
-> trạng thái graph. Query graph rỗng = overhead thuần túy.
+> **⚠️ Scope restriction**: Graphify là **code structure graph** — nó tự động extract từ source code.
+> KHÔNG có write API cho agents. KHÔNG chứa requirements, decisions, hay workflow data.
+> Chỉ dùng ở **steps 4-8** (code steps) khi cần hiểu code structure.
 
-### 2.1 Khi Nào Phải Update Graphify
-- ✅ Khi định nghĩa requirement mới hoặc cập nhật requirement
-- ✅ Khi đưa ra architecture decision (ADR)
-- ✅ Khi implement component/service mới
-- ✅ Khi phát hiện dependency mới giữa components
-- ✅ Khi một flowctl step hoàn thành
-- ✅ Khi bug được confirmed với root cause rõ ràng
-- ✅ Khi có risk mới được phát hiện
-- ❌ KHÔNG cần update với minor code changes hoặc typo fixes
+### 2.1 Graphify là gì (và không là gì)
+- ✅ Chứa: functions, classes, modules, call graphs, import relationships
+- ✅ Có thể query: `query_graph("auth flow")`, `query_graph("database schema")`
+- ❌ KHÔNG chứa: requirements, decisions, blockers, step outcomes, project constraints
+- ❌ KHÔNG có: `graphify_update_node`, `graphify_snapshot`, `graphify query "{domain}:*"`
 
-### 2.2 Node Naming Convention
+### 2.2 Graphify MCP Tools (4 tools thực tế)
 ```
-# Services/Components
-service:{name}                  # e.g., service:user-api
-component:{name}                # e.g., component:UserCard
-
-# Requirements
-requirement:us-{number}         # e.g., requirement:us-001
-requirement:epic-{number}       # e.g., requirement:epic-01
-
-# Design
-design:screen:{name}            # e.g., design:screen:login
-design:component:{name}         # e.g., design:component:Button
-design:token:{name}             # e.g., design:token:color-primary
-
-# Infrastructure
-infra:{resource-type}           # e.g., infra:database, infra:cluster
-
-# Quality & Testing
-test-case:tc-{number}           # e.g., test-case:tc-001
-defect:bug-{number}             # e.g., defect:bug-042
-
-# Architecture Decisions
-adr:{number}                    # e.g., adr:001
-
-# Workflow Progress
-step:{step-name}                # e.g., step:requirements-analysis
+query_graph("natural language question")  — Hỏi về code structure
+get_node(node_id)                         — Chi tiết 1 node
+get_neighbors(node_id, depth?)            — Dependencies
+shortest_path(source, target)             — Đường giữa 2 nodes
 ```
 
-### 2.3 Relationship Types (Chuẩn Hóa)
+### 2.3 Workflow Graphify đúng
 ```
-# Architecture relationships
---relation "calls"              # Service A gọi Service B
---relation "depends-on"         # A phụ thuộc vào B
---relation "persists-to"        # Service lưu data vào database
---relation "reads-from"         # Service đọc từ database/cache
---relation "integrates-with"    # Tích hợp với external system
+# Trước khi dùng: đọc overview
+graphify-out/GRAPH_REPORT.md   ← danh sách clusters, top nodes
 
-# Requirements relationships
---relation "implements"         # Component thực hiện requirement
---relation "decomposed-to"      # Epic phân rã thành user stories
---relation "requested-by"       # Requirement được yêu cầu bởi stakeholder
---relation "blocked-by"         # US bị chặn bởi US khác
-
-# Testing relationships
---relation "validates"          # Test xác nhận requirement
---relation "covers"             # Test bao phủ component/function
---relation "reported-by"        # Bug được báo cáo bởi test case
-
-# Design relationships
---relation "designed-as"        # Requirement được thiết kế thành screen
---relation "uses"               # Screen sử dụng component
+# Query code structure (tự nhiên)
+query_graph("authentication flow")
+query_graph("how does dispatch work")
+query_graph("database access patterns")
 ```
 
-### 2.4 Graphify Query Patterns Chuẩn
-```bash
-# Load context trước khi bắt đầu step
-graphify query "{domain}:*" --filter "status=active"
-graphify query "{domain}:{entity}" --depth 2  # Load related nodes
+### 2.4 Lazy Loading Rule
+Chỉ dùng Graphify khi `graphify-out/graph.json` tồn tại và có data.
+Dùng `flowctl audit-tokens` để kiểm tra trạng thái.
+Graph rỗng → skip, đọc code trực tiếp.
 
-# Cập nhật trạng thái
-graphify update "{node-id}" --status "{status}" --updated-at "{date}"
-
-# Tạo relationship
-graphify link "{source-id}" "{target-id}" --relation "{type}"
-
-# Snapshot sau khi hoàn thành step
-graphify snapshot "{step-name}-{date}"
-```
+> **Workflow data** (decisions, blockers, step context) → dùng `wf_step_context()` thay thế.
 
 ## 3. Quy Tắc Sử Dụng GitNexus
 
@@ -378,7 +330,7 @@ REQUIRED:  Secret rotation plan được document
 5. Approvers review tất cả documents (SLA: 24 giờ)
 6. Nếu có feedback: Agent address và resubmit
 7. Khi approved: Ghi lại approval với timestamp, approver names
-8. Update Graphify với step completion status
+8. Chạy `flowctl approve` → advance step (state tự động cập nhật)
 9. Proceed to next step
 
 ### 7.3 Blocking vs. Non-Blocking Issues
@@ -406,11 +358,11 @@ REQUIRED:  Secret rotation plan được document
 | Low | Low | Low | Ghi nhận, theo dõi |
 
 ### 8.2 Quy Trình Xử Lý Rủi Ro
-1. Phát hiện → Ghi vào Graphify risk register trong vòng 2 giờ
+1. Phát hiện → Ghi vào report (BLOCKER section) + `flowctl add-blocker` trong vòng 2 giờ
 2. Đánh giá mức độ → Xác định người chịu trách nhiệm
 3. Lập kế hoạch mitigation → Review với Tech Lead/PM
-4. Thực hiện mitigation → Cập nhật Graphify
-5. Verify resolved → Đóng risk item
+4. Thực hiện mitigation → Cập nhật trong report
+5. Verify resolved → `flowctl resolve-blocker <id>` → đóng item
 
 ### 8.3 Security Incident Response
 1. **Immediately**: Classify severity, notify Tech Lead + PM
@@ -459,7 +411,7 @@ REQUIRED:  Secret rotation plan được document
 - Agent Definitions: `.cursor/agents/`
 - Skills: `.cursor/skills/`
 - Templates: `workflows/templates/`
-- Graphify Integration: `.cursor/skills/graphify-integration.md`
+- Graphify Guide: `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` (code graph usage)
 - GitNexus Integration: `.cursor/skills/gitnexus-integration.md`
 - Review & Approval Rules: `.cursor/rules/review-rules.md`
 - Workflow Rules: `.cursor/rules/flowctl-rules.md`

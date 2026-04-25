@@ -42,15 +42,15 @@
 Trước khi bắt đầu bất kỳ step nào, lead agent PHẢI verify:
 - [ ] Step trước đã được APPROVED với approval document hợp lệ (trừ Step 1)
 - [ ] Tất cả blockers từ step trước đã được resolve hoặc formally accepted
-- [ ] Graphify đã cập nhật với trạng thái step trước
+- [ ] flowctl-state.json ghi nhận approval của step trước
 - [ ] Tất cả artifacts từ step trước đã được commit vào git
 - [ ] Các agents cần thiết cho step mới đã được notify
 
 ### 2.2 Quy Trình Khởi Động Step (Kickoff Protocol)
 ```
 1. Lead agent verify entry criteria
-2. Query Graphify để load context từ các steps trước
-   → graphify query "step:{previous-step}" --include-children
+2. Load workflow context
+   → wf_step_context()   ← decisions + blockers in 1 call
 3. Query GitNexus để hiểu trạng thái codebase
    → gitnexus status --branch develop
 4. Tạo branch mới theo convention
@@ -73,8 +73,8 @@ Trước khi bắt đầu bất kỳ step nào, lead agent PHẢI verify:
 ## Mục Tiêu Bước Này
 {Danh sách objectives cụ thể}
 
-## Context Từ Graphify
-{Key insights loaded từ knowledge graph}
+## Workflow Context
+{Key decisions và blockers từ wf_step_context()}
 
 ## GitNexus Branch
 {Branch name và strategy}
@@ -119,8 +119,8 @@ Mọi quyết định quan trọng PHẢI được ghi lại ngay khi đưa ra:
 **Lý do**: {Rationale}
 **Tác động**: {Impact on other steps/components}
 
-**Graphify update**:
-  graphify update "decision:{id}" --status "accepted"
+**Flowctl update**:
+  flowctl add-decision "{id}: {summary}"
 ```
 
 ### 3.3 Blocker Management
@@ -170,7 +170,7 @@ Khi gặp blocker:
 - [ ] Tất cả deliverables của step đã được hoàn thành
 - [ ] Tất cả tests liên quan đã pass
 - [ ] Tất cả documentation đã được cập nhật
-- [ ] Graphify đã được cập nhật với step completion
+- [ ] `flowctl collect` chạy thành công, state cập nhật
 - [ ] GitNexus đã commit tất cả changes với proper messages
 - [ ] Step Summary document đã được tạo
 - [ ] Review Checklist đã được điền đầy đủ
@@ -186,7 +186,7 @@ Step Summary PHẢI bao gồm các sections sau (xem template chi tiết):
 6. **Risks Mới Phát Hiện**: Risk register update
 7. **Dependencies cho Step Tiếp Theo**: Gì cần chuẩn bị
 8. **Lessons Learned**: Bài học cho future steps
-9. **Graphify Knowledge Graph Update**: Những gì đã add vào graph
+9. **Step Summary Update**: Những gì đã ghi vào workflows/steps/ và flowctl-state.json
 10. **GitNexus Activity**: Commits, PRs, branches trong step này
 
 ### 4.3 Handoff Protocol (Chuyển Giao Bước)
@@ -195,7 +195,7 @@ Khi chuyển từ step N sang step N+1:
 2. Brief lead agent của step N+1 (1-on-1 hoặc team sync)
 3. Briefing cover: decisions made, known issues, dependencies, gotchas
 4. Tất cả artifacts phải accessible (links trong handoff doc)
-5. Graphify context được verify đã sync
+5. flowctl-state.json verify đã sync với outcomes của step
 6. Overlap period 1-2 ngày nếu cần (cả hai agents cùng làm việc)
 7. Lead agent step N available cho questions trong 3 ngày sau
 
@@ -269,7 +269,7 @@ Trước khi chạy `approve`, PM hoặc lead agent PHẢI kiểm tra theo thứ
 - Clear interface contracts giữa parallel workstreams (API spec, design spec)
 - Integration checkpoints lên lịch (ít nhất 2x/tuần)
 - Conflict resolution protocol: Tech Lead final say
-- Graphify track tất cả cross-stream dependencies
+- Tech Lead track tất cả cross-stream dependencies trong context-digest.md
 
 ### 6.3 Integration Checkpoints
 Trong parallel execution, schedule:
@@ -282,18 +282,13 @@ Mid-point: Integration smoke test
 
 ## 7. Metrics và Monitoring
 
-### 7.1 Step-level Metrics (Track trong Graphify)
+### 7.1 Step-level Metrics (Track trong flowctl-state.json)
 ```
-graphify update "step:{name}:metrics" \
-  --planned-effort "{hours}" \
-  --actual-effort "{hours}" \
-  --completion "{percentage}" \
-  --defects-found "{count}" \
-  --scope-changes "{count}"
+flowctl add-decision "step-metrics: effort={actual}/{planned}h, completion={pct}%, defects={count}"
+# Hoặc ghi trực tiếp vào step summary document
 ```
 
 ### 7.2 Workflow Health Indicators
-Cập nhật hàng ngày trong Graphify:
 ```
 Overall Progress:   {N}/9 steps complete
 Current Step:       Step {N} - {Name} - {Status}
@@ -337,7 +332,7 @@ Format: Quick async retrospective (15 phút hoặc async document)
 ### 8.2 Workflow Rollback (Về Step Trước)
 1. PM PHẢI approve flowctl reset (formal decision)
 2. Document lý do rollback trong detail
-3. Update Graphify: `graphify update "flowctl" --rollback-to "step:{N}"`
+3. Chạy `flowctl rollback --to step:{N}` (hoặc reset state thủ công)
 4. GitNexus: Xác định commits nào cần revert
 5. Notify toàn bộ team với impact assessment
 6. Re-plan affected steps với updated timeline
@@ -355,7 +350,7 @@ Khi vào giai đoạn cuối (Step 7 trở đi):
 ### Step 1 - Requirements Analysis
 - Không được bắt đầu design hoặc code cho đến khi requirements approved
 - User Stories phải có Acceptance Criteria dạng BDD (Given/When/Then)
-- Tất cả requirements phải được link đến business objective trong Graphify
+- Tất cả requirements phải được link đến business objective trong PRD document
 
 ### Step 2 - System Design
 - Architecture phải review performance và scalability với projected load

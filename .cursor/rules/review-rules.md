@@ -431,17 +431,13 @@ docs/
     ADR-002-{title}.md
 ```
 
-### 6.3 Graphify Audit Nodes
+### 6.3 Approval Records
 ```bash
-# Record mỗi approval
-graphify update "approval:step-{N}" \
-  --status "approved" \
-  --date "{YYYY-MM-DD}" \
-  --approvers "{comma-separated list}" \
-  --conditions "{if any}"
+# Record approval qua flowctl
+flowctl approve --by "{approver}" --notes "{conditions if any}"
 
-# Link approval đến step
-graphify link "approval:step-{N}" "step:{name}" --relation "authorizes"
+# Approval tự động ghi vào flowctl-state.json với timestamp + approver
+# Xem: flowctl status → hiển thị approval history
 ```
 
 ## 7. Special Review Scenarios
@@ -468,13 +464,12 @@ Khi Steps 4 và 5 chạy parallel:
 
 ## 8. Metrics cho Review Process
 
-Track trong Graphify:
-```
-graphify update "metric:review-process" \
-  --avg-review-time "{hours}" \
-  --rejection-rate "{percentage}" \
-  --conditions-rate "{percentage}" \
-  --step "{N}"
+Track trong step summary document (`workflows/steps/NN-*/summary.md`):
+```markdown
+## Review Metrics
+- Review time: {hours}
+- Rejection reason: {if applicable}
+- Conditions: {list}
 ```
 
 Target metrics:

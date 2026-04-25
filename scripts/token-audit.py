@@ -34,6 +34,10 @@ GRAPHIFY_FILE = REPO_ROOT / ".graphify" / "graph.json"
 OVERHEAD_TOOLS = {
     "wf_state", "wf_step_context", "wf_git", "wf_files",
     "wf_read", "wf_env", "wf_reports_status", "wf_cache_invalidate",
+    # graphify MCP tools (actual names from graphify.serve)
+    "query_graph", "get_node", "get_neighbors", "get_community",
+    "god_nodes", "graph_stats", "shortest_path",
+    # legacy aliases (kept for backwards compat with old events)
     "graphify_query", "graphify_search", "graphify_get_dependencies",
     "graphify_get_clusters", "graphify_update_node", "graphify_snapshot",
     "gitnexus_query", "gitnexus_get_context", "gitnexus_detect_changes",
@@ -373,9 +377,9 @@ def print_report(
     g_rels   = graph["relationships"]
     if g_status == "MISSING":
         print(f"  Status : {red('MISSING')}  — graph.json không tồn tại")
-        print(f"  {red('⚠ Graphify không có data. Mọi graphify_query() đều trả về rỗng.')}")
+        print(f"  {red('⚠ Graphify chưa có graph. Mọi query_graph() đều trả về rỗng.')}")
         print(f"     → Tất cả overhead từ Graphify là lãng phí thuần túy.")
-        print(f"     → Fix: Agents phải chạy graphify_update_node() sau mỗi task để populate graph.\n")
+        print(f"     → Fix: Chạy `python3 -m graphify update .` để build code graph.\n")
     elif g_nodes < 10:
         print(f"  Status : {yel('SPARSE')}  — {g_nodes} nodes, {g_rels} relationships")
         print(f"  {yel('Graph quá thưa. Graphify queries ít có giá trị.')}\n")

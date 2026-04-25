@@ -358,9 +358,12 @@ cmd_start() {
   bash "$WORKFLOW_ROOT/scripts/hooks/invalidate-cache.sh" state 2>/dev/null || true
   echo -e "\n${GREEN}${BOLD}Step $step — $name đã bắt đầu${NC}"
   echo -e "Agent chính: ${YELLOW}@$agent${NC}"
-  echo -e "\nKhởi động Graphify context:"
-  echo -e "  ${CYAN}graphify_query(\"step:$step:context\")${NC}"
-  echo -e "  ${CYAN}gitnexus_get_architecture()${NC}"
+  echo -e "\nLoad workflow context:"
+  echo -e "  ${CYAN}wf_step_context()${NC}          ← decisions + blockers (1 call)"
+  if [[ "$step" -ge 4 ]]; then
+    echo -e "  ${CYAN}gitnexus_get_architecture()${NC} ← codebase structure"
+    echo -e "  ${CYAN}query_graph(\"...\")${NC}          ← code structure questions"
+  fi
   echo -e "\nXem agent guide: ${BOLD}.cursor/agents/${agent}-agent.md${NC}\n"
 }
 

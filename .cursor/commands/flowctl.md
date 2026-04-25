@@ -59,12 +59,11 @@ Lệnh này tự phát hiện complexity và output **War Room Spawn Board** (PM
 1. Tab 1 `@pm`: Đọc `workflows/dispatch/step-N/war-room/pm-analysis-brief.md` → Phân tích scope, objectives, acceptance criteria
 2. Tab 2 `@tech-lead`: Đọc `workflows/dispatch/step-N/war-room/tech-lead-assessment-brief.md` → Feasibility, risks, mercenary recommendations
 
-**Graph context** (mỗi agent chạy trước khi làm):
+**Workflow context** (mỗi agent chạy trước khi làm):
 ```
-graphify_query("project:requirements")
-graphify_query("technical:constraints")
-graphify_query("step:{N-1}:outcomes")
+wf_step_context()    ← state + decisions + blockers (1 call, ~300 tokens)
 ```
+> Graphify chỉ dùng cho code structure questions ở steps 4-8: `query_graph("auth flow")`
 
 Khi cả 2 hoàn thành:
 ```bash
@@ -99,10 +98,10 @@ Với mỗi role trong step hiện tại:
 ```
 
 Mỗi worker agent phải:
-1. Load context via 3-layer protocol (Graphify → GitNexus → files)
+1. Load context via layers: `wf_step_context()` → GitNexus (code steps) → `query_graph()` (code structure) → files
 2. Thực hiện nhiệm vụ trong brief
 3. Ghi report vào `workflows/dispatch/step-N/reports/[role]-report.md`
-4. Update graph: `graphify_update_node("step:N:[role]:done", {...})`
+4. Khai báo DELIVERABLE: với path thực tế (EVIDENCE)
 5. Khai báo `NEEDS_SPECIALIST` nếu bị block
 
 ---
@@ -201,13 +200,12 @@ Trình bày cho user:
 
 ## Token Optimization Protocol
 
-Mọi agent phải follow 3-layer context loading:
+Mọi agent phải follow 4-layer context loading:
 
-**Layer 1 — Graphify (ưu tiên cao nhất, ~300 tokens/query):**
+**Layer 1 — Workflow MCP (ưu tiên cao nhất, ~300 tokens):**
 ```
-graphify_query("step:{N-1}:outcomes")   ← prior results
-graphify_query("project:constraints")   ← hard constraints
-graphify_query("open:blockers:{role}")  ← relevant blockers
+wf_step_context()                        ← state + decisions + blockers (1 call)
+wf_state()                               ← step/status only (nếu đủ)
 ```
 
 **Layer 2 — GitNexus (code steps 4-8 only):**
@@ -216,11 +214,18 @@ gitnexus_get_architecture()              ← codebase overview
 gitnexus_impact_analysis("{file}")       ← trước khi sửa code
 ```
 
-**Layer 3 — File reads (fallback):**
-- `@workflows/dispatch/step-N/context-digest.md` ← War Room output
-- Specific files only khi layers 1+2 không đủ
+**Layer 3 — Graphify code graph (steps 4-8 only, code structure questions):**
+```
+query_graph("tên flow hoặc component")   ← code structure only
+get_neighbors("SymbolName")              ← dependencies của symbol
+```
+> Graphify KHÔNG có workflow data. Dùng cho code questions, không phải requirements/decisions.
 
-**Không được đọc toàn bộ prior step reports — query graph thay thế.**
+**Layer 4 — File reads (fallback):**
+- `@workflows/dispatch/step-N/context-digest.md` ← War Room output
+- Specific files only khi layers 1-3 không đủ
+
+**Không được đọc toàn bộ prior step reports.**
 
 ---
 

@@ -93,33 +93,31 @@ PM Agent đại diện cho Product Manager trong quy trình phát triển sản 
 - Data-driven decision making
 
 ### Tools Used
-- **Graphify**: Quản lý requirements knowledge graph
+- **Workflow MCP**: `wf_step_context()` cho workflow context; Graphify chỉ dùng cho code structure
 - **GitNexus**: Theo dõi feature branches, PR status
 - Jira/Linear: Issue tracking (nếu có)
 - Confluence/Notion: Documentation
 - Figma: Review UI/UX designs (không tạo)
 
-## Graphify Integration
+## Context Loading
 
 ### Khi Bắt Đầu Step 1
 ```
-graphify query "project:requirements"
-graphify query "stakeholder:needs"
-graphify query "business:goals"
+wf_step_context()    ← workflow state + prior decisions + blockers (1 call)
+wf_state()           ← step/status only nếu đủ
 ```
+> Graphify chỉ chứa code structure (steps 4-8). Step 1 không có code → không dùng Graphify.
 
-### Khi Cập Nhật Requirements
-```
-graphify update "requirement:{id}" --title "{title}" --priority "{priority}" --status "{status}"
-graphify link "requirement:{id}" "stakeholder:{name}" --relation "requested-by"
-graphify link "requirement:{id}" "user-story:{id}" --relation "decomposed-to"
-```
+### Lưu Requirements Output
+Ghi vào file markdown chuẩn:
+- `workflows/steps/01-requirements/prd.md`
+- `workflows/steps/01-requirements/user-stories.md`
+- `workflows/steps/01-requirements/acceptance-criteria.md`
 
 ### Sau Khi Hoàn Thành Step 1
-```
-graphify update "step:requirements-analysis" --status "completed"
-graphify update "project:requirements" --completeness "{percentage}"
-graphify snapshot "requirements-baseline-v1"
+```bash
+flowctl collect    # tổng hợp decisions + blockers từ reports
+flowctl approve    # sau khi human approve
 ```
 
 ## GitNexus Integration
@@ -160,24 +158,24 @@ gitnexus commit --type "feat" --scope "product" --message "define acceptance cri
 ## Workflow Hoạt Động
 
 ### Step 1: Requirements Analysis (Primary)
-1. **Initiate**: Query Graphify để load context dự án hiện tại
+1. **Initiate**: Chạy `wf_step_context()` để load workflow context
 2. **Gather**: Thu thập requirements qua interviews, workshops, documents
 3. **Analyze**: Phân tích và categorize requirements
 4. **Prioritize**: MoSCoW prioritization với stakeholders
 5. **Document**: Tạo PRD với User Stories và Acceptance Criteria
 6. **Validate**: Review với stakeholders
-7. **Update Graphify**: Commit requirements vào knowledge graph
+7. **Document**: Lưu requirements vào `workflows/steps/01-requirements/`
 8. **Summary**: Tạo step summary document
 9. **Request Approval**: Submit approval request cho Tech Lead và stakeholders
 
 ### Step 9: Review & Release (Primary)
-1. **Load Context**: Query Graphify để review toàn bộ project state
+1. **Load Context**: Chạy `wf_step_context()` để review project state
 2. **Verify DoD**: Kiểm tra tất cả acceptance criteria đã met
 3. **UAT Review**: Review UAT results từ QA
 4. **Stakeholder Demo**: Tổ chức demo cho stakeholders
 5. **Go/No-Go Decision**: Đưa ra quyết định release
 6. **Release Notes**: Phê duyệt release notes
-7. **Update Graphify**: Capture lessons learned
+7. **Document**: Ghi lessons learned vào `workflows/retro/lessons.json`
 8. **Final Summary**: Tạo project closure summary
 
 ## Output Templates
@@ -232,7 +230,7 @@ gitnexus commit --type "feat" --scope "product" --message "define acceptance cri
 - [ ] Tất cả User Stories có Acceptance Criteria rõ ràng
 - [ ] MoSCoW prioritization đã được stakeholder approve
 - [ ] Technical feasibility đã được Tech Lead confirm
-- [ ] Graphify cập nhật với requirements graph đầy đủ
+- [ ] `flowctl collect` chạy thành công, decisions/blockers ghi vào state
 - [ ] Step summary document hoàn chỉnh
 - [ ] Không có blocking issues chưa giải quyết
 

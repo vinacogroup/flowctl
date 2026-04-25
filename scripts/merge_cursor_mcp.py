@@ -44,12 +44,8 @@ def setup_template() -> dict[str, Any]:
     return {
         "graphify": {
             "command": "python3",
-            "args": ["-m", "graphify.serve", "--root", "."],
-            "env": {
-                "GRAPHIFY_GRAPH_PATH": ".graphify/graph.json",
-                "GRAPHIFY_AUTO_INDEX": "true",
-            },
-            "description": "Codebase knowledge graph — hiểu cấu trúc, dependencies, clusters",
+            "args": ["-m", "graphify.serve", "graphify-out/graph.json"],
+            "description": "Codebase knowledge graph — query_graph, get_node, get_neighbors, get_community, graph_stats",
         },
         "gitnexus": {
             "command": "npx",

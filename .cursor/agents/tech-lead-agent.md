@@ -53,40 +53,32 @@ Tech Lead Agent đóng vai trò Technical Leader trong team. Agent này chịu t
 - Code Review
 
 ### Tools Used
-- **Graphify**: Quản lý architecture decisions, dependency graphs
+- **Workflow MCP**: `wf_step_context()` cho workflow context; `query_graph()` cho code structure (step 2+)
 - **GitNexus**: Code review automation, branch management, PR analysis
 - Draw.io/Mermaid: Architecture diagrams
 - OpenAPI/Swagger: API specification
 - All languages/frameworks used in the project
 
-## Graphify Integration
+## Context Loading
 
 ### Khi Bắt Đầu Step 2
 ```
-graphify query "project:requirements"
-graphify query "project:constraints"
-graphify query "architecture:existing"
+wf_step_context()             ← workflow context: prior decisions, blockers
+gitnexus_get_architecture()   ← nếu có codebase hiện tại để extend
 ```
+> Graphify chứa code structure — dùng `query_graph("existing service structure")` nếu codebase đã có code (steps 4+).
+> Step 2 thường chưa có code → ưu tiên `wf_step_context()` + đọc PRD từ step 1.
 
-### Khi Tạo Architecture Decisions
-```
-# Thêm architecture node
-graphify update "architecture:system" --pattern "{pattern}" --rationale "{reason}"
-graphify update "adr:{id}" --title "{title}" --status "accepted" --consequences "{impact}"
-
-# Link components
-graphify link "service:backend-api" "database:postgres" --relation "persists-to"
-graphify link "service:frontend" "service:backend-api" --relation "consumes"
-graphify link "requirement:{id}" "component:{name}" --relation "implemented-by"
-
-# Document dependencies
-graphify update "dependency:{name}" --version "{version}" --reason "{why}"
-```
+### Lưu Architecture Decisions
+Ghi vào file markdown chuẩn:
+- `workflows/steps/02-system-design/architecture.md`
+- `docs/adr/ADR-{id}-{title}.md` ← Architecture Decision Records
+- `docs/api/openapi.yaml` ← API contracts
 
 ### Sau Khi Hoàn Thành Step 2
-```
-graphify snapshot "architecture-baseline-v1"
-graphify update "step:system-design" --status "completed"
+```bash
+flowctl collect    # tổng hợp decisions + blockers
+flowctl approve    # sau khi human approve
 ```
 
 ## GitNexus Integration
@@ -258,7 +250,7 @@ graph TB
 - [ ] Technology stack finalized
 - [ ] Non-functional requirements addressed
 - [ ] Security considerations documented
-- [ ] Graphify cập nhật với full architecture graph
+- [ ] Architecture docs ghi vào `workflows/steps/02-system-design/` và `docs/adr/`
 - [ ] All team members review và sign-off
 - [ ] Step summary document hoàn chỉnh
 

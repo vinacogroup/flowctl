@@ -330,10 +330,10 @@ function tool_step_context({ step } = {}) {
     context_digest_summary: digestSummary,
     mercenary_outputs: existsSync(mercDir) ? readdirSync(mercDir).filter(f => f.endsWith('-output.md')) : [],
     deliverables: s.deliverables ?? [],
-    graph_queries: [
-      `graphify_query("step:${currentStep - 1}:outcomes")`,
-      `graphify_query("project:constraints")`,
-      `graphify_query("open:blockers")`,
+    wf_tools_hint: [
+      'wf_step_context()   ← state + decisions + blockers in 1 call',
+      'wf_state()          ← step/status only',
+      'wf_git()            ← branch + recent commits',
     ],
     _cache: 'miss',
   };

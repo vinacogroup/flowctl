@@ -12,8 +12,8 @@ wf_state()              ← thay cho: cat flowctl-state.json + flowctl status
 # 2. Đọc context đầy đủ của step hiện tại
 wf_step_context()       ← thay cho: đọc 5+ files riêng lẻ
 
-# 3. Load graph context (nếu Graphify available)
-graphify_query("project:requirements")
+# 3. Load code graph context (chỉ dùng ở steps 4-8, cho code questions)
+query_graph("tên flow cần hiểu")   ← chỉ code structure, không phải workflow data
 ```
 
 > **Quy tắc token**: Dùng MCP tools trước bash. Bash chỉ dùng cho write operations.
@@ -93,31 +93,40 @@ wf_cache_invalidate(scope?)     — Invalidate cache (all|git|state|files)
 
 **Thứ tự ưu tiên khi cần thông tin:**
 ```
-1. wf_step_context()  ← tất cả trong 1 call
+1. wf_step_context()  ← tất cả workflow context trong 1 call
 2. wf_state()         ← nếu chỉ cần flowctl state
-3. graphify_query()   ← nếu cần knowledge graph
-4. wf_git()           ← nếu cần git context
+3. wf_git()           ← nếu cần git context
+4. query_graph()      ← nếu cần code structure (steps 4-8 only)
 5. wf_read()          ← nếu cần đọc file cụ thể
 6. bash [cmd]         ← CHỈ cho write operations
 ```
 
 ---
 
-### Graphify Tools (knowledge graph)
+### Graphify Tools (code structure graph — steps 4-8 only)
 
+MCP server: `graphify.serve` — 4 tools thực tế:
 ```
-graphify_query(topic)           — Query knowledge graph theo chủ đề
-graphify_search(keyword)        — Tìm nodes liên quan đến keyword
-graphify_get_dependencies(node) — Lấy dependencies của một component
-graphify_get_clusters()         — Xem các cluster code liên quan
-graphify_update_node(id, data)  — Cập nhật node trong graph
-graphify_snapshot(label)        — Tạo snapshot của graph tại thời điểm hiện tại
+query_graph(query, budget?)     — Hỏi về code structure bằng ngôn ngữ tự nhiên
+                                  Ví dụ: query_graph("show the auth flow")
+                                  KHÔNG dùng cho: requirements, decisions, blockers
+get_node(node_id)               — Lấy thông tin node code cụ thể
+get_neighbors(node_id, depth?)  — Lấy dependencies của một symbol/module
+shortest_path(source, target)   — Tìm đường ngắn nhất giữa 2 code nodes
 ```
 
-**Khi nào dùng:**
-- Bắt đầu mỗi step: query context từ các steps trước
-- Sau mỗi quyết định quan trọng: update node
-- Cuối mỗi step: tạo snapshot
+**Workflow trước khi dùng:**
+1. Đọc `graphify-out/GRAPH_REPORT.md` để biết codebase đang index gì
+2. Dùng `query_graph()` cho câu hỏi về code structure (không phải workflow data)
+
+Rebuild graph: `python3 -m graphify update .` → output: `graphify-out/graph.json`
+
+**QUAN TRỌNG — Graphify chỉ chứa code structure:**
+- ✅ ĐÚNG: `query_graph("authentication flow")`, `query_graph("database schema")`
+- ❌ SAI: `query_graph("project:requirements")`, `query_graph("open:blockers")` — không tồn tại
+
+**Khi nào dùng:** Steps 4-8 (Backend, Frontend, Integration, QA, DevOps) khi cần hiểu code structure.
+**Workflow data** (decisions, blockers, step outcomes) → dùng `wf_step_context()` thay thế.
 
 ### GitNexus Tools (code intelligence)
 
@@ -154,8 +163,8 @@ workflow_add_decision(data)     — Ghi lại quyết định quan trọng
 
 ```
 1. workflow_get_state()                    → Xác nhận step và agent
-2. graphify_query("step:<N>:context")      → Load context từ steps trước
-3. gitnexus_get_architecture()             → Hiểu codebase hiện tại
+2. wf_step_context()                       → Load workflow context (decisions, blockers)
+3. gitnexus_get_architecture()             → Hiểu codebase hiện tại (steps 4-8)
 4. Đọc .cursor/agents/<role>-agent.md      → Load agent persona và skills
 5. Tạo kickoff document                    → workflows/steps/NN-<name>.md
 ```
@@ -166,17 +175,16 @@ workflow_add_decision(data)     — Ghi lại quyết định quan trọng
 - Mọi quyết định quan trọng → workflow_add_decision()
 - Mọi blocker phát sinh     → workflow_add_blocker()
 - Thay đổi code đáng kể     → gitnexus_detect_changes() để verify
-- Milestone quan trọng      → graphify_update_node()
+- Code structure questions  → query_graph("...") (steps 4-8 only)
 ```
 
 ### Khi KẾT THÚC step:
 
 ```
 1. Tạo step summary (dùng workflows/templates/step-summary-template.md)
-2. graphify_snapshot("step-<N>-complete")
-3. Điền review checklist (workflows/templates/review-checklist-template.md)
-4. workflow_request_approval({step, summary, checklist})
-5. ⏸️  DỪNG — Chờ human approve trước khi sang step tiếp theo
+2. Điền review checklist (workflows/templates/review-checklist-template.md)
+3. workflow_request_approval({step, summary, checklist})
+4. ⏸️  DỪNG — Chờ human approve trước khi sang step tiếp theo
 ```
 
 ### Khi NHẬN APPROVAL:

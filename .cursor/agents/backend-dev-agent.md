@@ -56,45 +56,33 @@ Backend Developer Agent chịu trách nhiệm toàn bộ server-side development
 - Testing: pytest, Jest, JUnit, Postman/Newman
 
 ### Tools Used
-- **Graphify**: Query để hiểu dependencies, update service graph
+- **Workflow MCP + Graphify**: `wf_step_context()` + `query_graph()` cho code structure (step 4)
 - **GitNexus**: Smart commits, PR management, code review assistance
 
-## Graphify Integration
+## Context Loading
 
 ### Khi Bắt Đầu Step 4
 ```
-# Load architecture và requirements context
-graphify query "architecture:backend"
-graphify query "api:contracts"
-graphify query "database:schema"
-graphify query "requirement:*" --filter "status=approved,component=backend"
+wf_step_context()              ← workflow context: prior decisions, API contracts, blockers
+gitnexus_get_architecture()    ← codebase structure hiện tại
+query_graph("backend service structure")   ← code graph: existing services/patterns
 ```
+> API contracts đọc từ `docs/api/openapi.yaml`. Architecture từ `workflows/steps/02-system-design/`.
+> Graphify (`query_graph`) trả lời code structure questions, không có requirement/API data.
 
-### Trong Quá Trình Development
+### Code Graph Queries Hữu Ích (step 4)
 ```
-# Đăng ký API endpoints
-graphify update "api:endpoint:{method}-{path}" \
-  --method "{GET|POST|PUT|DELETE}" \
-  --path "{/api/v1/resource}" \
-  --status "implemented" \
-  --auth "required|optional|none"
-
-# Track service dependencies
-graphify link "service:user-service" "database:postgres" --relation "reads-from"
-graphify link "service:order-service" "service:user-service" --relation "calls"
-graphify link "service:notification" "external:sendgrid" --relation "integrates-with"
-
-# Document business rules
-graphify update "business-rule:{id}" \
-  --description "{rule description}" \
-  --implemented-in "{file:line}"
+query_graph("database access patterns")
+query_graph("authentication middleware")
+query_graph("service dependencies")
+get_neighbors("ServiceName")        ← upstream/downstream
+gitnexus_impact_analysis("{file}")  ← trước khi sửa existing code
 ```
 
 ### Sau Khi Hoàn Thành Step 4
-```
-graphify snapshot "backend-implementation-v1"
-graphify update "step:backend-development" --status "completed"
-graphify update "project:api-coverage" --percentage "{n}"
+```bash
+flowctl collect    # tổng hợp decisions + blockers
+flowctl approve    # sau khi human approve
 ```
 
 ## GitNexus Integration
@@ -332,7 +320,7 @@ describe('ResourceService', () => {
 ### Documentation
 - [ ] OpenAPI spec updated với tất cả changes
 - [ ] README updated với setup instructions
-- [ ] Graphify updated với service graph
+- [ ] `flowctl collect` chạy thành công, decisions/blockers ghi vào state
 
 ## Liên Kết
 

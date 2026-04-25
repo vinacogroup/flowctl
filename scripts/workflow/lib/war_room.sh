@@ -65,7 +65,7 @@ _war_room_generate_briefs() {
   local step="$1" step_name="$2" wr_dir="$3"
 
   # Load lessons from prior retros
-  local lessons_file="$REPO_ROOT/.graphify/lessons.json"
+  local lessons_file="$REPO_ROOT/workflows/retro/lessons.json"
   local lessons_text=""
   if [[ -f "$lessons_file" ]]; then
     lessons_text=$(python3 -c "
@@ -103,12 +103,10 @@ PY
 ## Nhiệm vụ
 Bạn là PM Agent. Đây là War Room phase — phân tích scope và business objectives TRƯỚC khi dispatch team.
 
-## Graph Context (chạy ngay, trước khi làm gì khác)
+## Workflow Context (chạy ngay, trước khi làm gì khác)
 \`\`\`
-graphify_query("project:requirements")
-graphify_query("project:constraints")
-graphify_query("step:$(($step - 1)):outcomes")
-graphify_query("open:blockers")
+wf_step_context()          ← state + decisions + blockers (1 call)
+wf_state()                 ← nếu chỉ cần step/status hiện tại
 \`\`\`
 
 ## Prior Decisions (từ steps trước)
@@ -138,10 +136,6 @@ Format:
 ## Suggested Definition of Done per Role
 \`\`\`
 
-Sau đó update graph:
-\`\`\`
-graphify_update_node("war-room:step:$step:pm", { objectives: [...], scope: [...] })
-\`\`\`
 BRIEF
 
   # TechLead assessment brief
@@ -151,13 +145,12 @@ BRIEF
 ## Nhiệm vụ
 Bạn là Tech Lead. Đây là War Room phase — đánh giá feasibility kỹ thuật TRƯỚC khi dispatch team.
 
-## Graph Context (chạy ngay)
+## Context Loading (chạy ngay)
 \`\`\`
-graphify_query("technical:constraints")
-graphify_query("architecture:decisions")
-graphify_query("open:blockers:technical")
-gitnexus_get_architecture()
+wf_step_context()              ← workflow state + decisions + blockers
+gitnexus_get_architecture()    ← codebase structure (nếu là code step)
 \`\`\`
+> Graphify (query_graph) chỉ dùng cho câu hỏi về code structure, không có workflow data.
 
 ## Prior Decisions (từ steps trước)
 $prior_decisions
@@ -186,10 +179,6 @@ Format:
     priority: before|parallel|after
 \`\`\`
 
-Sau đó update graph:
-\`\`\`
-graphify_update_node("war-room:step:$step:tech-lead", { feasible: true, risks: [...] })
-\`\`\`
 BRIEF
 
   echo -e "${GREEN}✓${NC} War Room briefs đã tạo tại ${CYAN}${wr_dir#$REPO_ROOT/}/${NC}"
@@ -267,14 +256,13 @@ Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Mode: {mode}
 
 ---
 
-## 🔍 Graph Queries (chạy để lấy live data — ưu tiên hơn file này)
+## 🔍 Workflow Context (chạy để lấy live data — ưu tiên hơn file này)
 \`\`\`
-graphify_query("step:{int(step)-1}:outcomes")
-graphify_query("project:constraints")
-graphify_query("open:blockers")
-graphify_query("aligned-plan:step:{step}")
+wf_step_context()    ← state + decisions + blockers trong 1 call (~300 tokens)
+wf_state()           ← nếu chỉ cần step/status
 \`\`\`
-Chỉ đọc các sections bên dưới nếu Graphify MCP unavailable.
+> Chỉ đọc các sections bên dưới nếu MCP tools unavailable.
+> Graphify (query_graph) chỉ dùng cho code structure questions ở steps 4-8.
 
 ---
 
@@ -300,10 +288,11 @@ if tl_assessment:
 
 digest += f"""---
 ## 📌 How to Use This Digest
-- **Layer 1**: Run Graphify queries above (cheapest, most current)
-- **Layer 2**: Run gitnexus_get_architecture() if working on code
-- **Layer 3**: Read this file only for sections not covered by queries
-- **Never** read all prior step reports — query graph instead
+- **Layer 1**: Run `wf_step_context()` (cheapest, ~300 tokens, most current)
+- **Layer 2**: Run `gitnexus_get_architecture()` if working on code (steps 4-8)
+- **Layer 3**: Use `query_graph("specific code question")` for code structure only
+- **Layer 4**: Read this file only for sections not covered above
+- **Never** read all prior step reports individually
 """
 
 Path("$digest_file").write_text(digest)

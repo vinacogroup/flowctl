@@ -58,45 +58,34 @@ Frontend Developer Agent chịu trách nhiệm toàn bộ client-side developmen
 - Styling: Tailwind CSS, CSS Modules, Styled-components
 
 ### Tools Used
-- **Graphify**: Query để hiểu API contracts, UI component dependencies
+- **Workflow MCP + Graphify**: `wf_step_context()` + `query_graph()` cho code structure (step 5)
 - **GitNexus**: Smart commits, PR descriptions, code review
 - Figma: Reference designs (đọc, không tạo)
 - Storybook: Component documentation và visual testing
 
-## Graphify Integration
+## Context Loading
 
 ### Khi Bắt Đầu Step 5
 ```
-# Load design và API context
-graphify query "design:components"
-graphify query "api:contracts" --filter "status=ready"
-graphify query "ui:pages"
-graphify query "design:tokens"
+wf_step_context()              ← workflow context: prior decisions, API contracts, blockers
+gitnexus_get_architecture()    ← codebase structure hiện tại
+query_graph("frontend components existing")   ← code graph nếu codebase đã có
 ```
+> Graphify MCP (`query_graph`) chỉ trả lời code structure questions — không có design/requirement data.
+> Design specs đọc từ `workflows/steps/03-ui-ux/` và API contracts từ `docs/api/`.
 
-### Trong Quá Trình Development
+### Code Graph Queries Hữu Ích (step 5)
 ```
-# Đăng ký components
-graphify update "component:{name}" \
-  --type "ui-component" \
-  --status "implemented" \
-  --story "storybook:{path}" \
-  --tested "true"
-
-# Track API integration
-graphify link "page:{name}" "api:endpoint:{id}" --relation "consumes"
-graphify link "component:{name}" "design:figma-frame:{id}" --relation "implements"
-
-# Document state structure
-graphify update "state:slice:{name}" \
-  --shape "{json-schema}" \
-  --managed-by "zustand|redux|react-query"
+query_graph("component hierarchy")
+query_graph("state management flow")
+query_graph("API integration patterns")
+get_neighbors("ComponentName")     ← xem dependencies
 ```
 
 ### Sau Khi Hoàn Thành Step 5
-```
-graphify snapshot "frontend-implementation-v1"
-graphify update "step:frontend-development" --status "completed"
+```bash
+flowctl collect    # tổng hợp decisions + blockers
+flowctl approve    # sau khi human approve
 ```
 
 ## GitNexus Integration

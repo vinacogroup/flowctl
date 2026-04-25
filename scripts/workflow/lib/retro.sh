@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # retro.sh — Retrospective snapshot sau khi approve
-# Extracts patterns → .graphify/lessons.json → dùng cho War Room bước tiếp theo
+# Extracts patterns → workflows/retro/lessons.json → dùng cho War Room bước tiếp theo
 
 cmd_retro() {
   local step="${1:-}"
@@ -16,7 +16,7 @@ cmd_retro() {
   local reports_dir="$REPO_ROOT/workflows/dispatch/step-$step/reports"
   local wr_dir="$REPO_ROOT/workflows/dispatch/step-$step/war-room"
   local merc_dir="$REPO_ROOT/workflows/dispatch/step-$step/mercenaries"
-  local lessons_file="$REPO_ROOT/.graphify/lessons.json"
+  local lessons_file="$REPO_ROOT/workflows/retro/lessons.json"
 
   echo -e "\n${BOLD}${CYAN}🔄 RETRO — Step $step: $step_name${NC}\n"
 
@@ -130,22 +130,6 @@ if patterns:
 "
 
   echo ""
-  echo -e "${GREEN}✓${NC} Lessons saved: ${CYAN}.graphify/lessons.json${NC}"
-  echo ""
-
-  # Output graphify commands for agent to run
-  echo -e "${BOLD}📊 Graph Updates (PM agent chạy sau):${NC}"
-  echo "$retro_data" | python3 -c "
-import json, sys
-d = json.load(sys.stdin)
-step = d['step']
-print(f'graphify_update_node(\"step:{step}:retro\", {{')
-print(f'  n_decisions: {d[\"n_decisions\"]},')
-print(f'  blocker_counts: {json.dumps(d[\"blocker_counts\"])},')
-print(f'  mercenaries: {json.dumps(d[\"mercenaries_used\"])},')
-print(f'  patterns: {json.dumps(d[\"patterns\"])}')
-print(f'}})')
-print(f'graphify_snapshot(\"step-{step}-retro\")')
-"
+  echo -e "${GREEN}✓${NC} Lessons saved: ${CYAN}workflows/retro/lessons.json${NC}"
   echo ""
 }

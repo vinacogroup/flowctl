@@ -436,20 +436,18 @@ Review time estimate:
 - > 500 LOC: Request to split into smaller PRs
 ```
 
-## 7. Review Metrics (Track trong Graphify)
+## 7. Review Metrics
 
-```bash
-graphify update "metric:code-review" \
-  --pr-number "{n}" \
-  --review-duration-hours "{h}" \
-  --blocker-count "{n}" \
-  --important-count "{n}" \
-  --suggestion-count "{n}" \
-  --approved "true|false"
+Ghi vào step summary hoặc PR description:
 
-# Team metrics (monthly)
-graphify query "metric:code-review:*" \
-  --aggregate "avg-duration,blocker-rate,approval-rate"
+```markdown
+## Code Review Summary
+- PR: #{n}
+- Review time: {h} hours
+- Blockers: {n}
+- Issues: {n}
+- Suggestions: {n}
+- Result: Approved / Changes Requested
 ```
 
 ## 8. Liên Kết

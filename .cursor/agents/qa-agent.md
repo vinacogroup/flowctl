@@ -69,7 +69,7 @@ QA Agent chịu trách nhiệm toàn bộ quality assurance cho sản phẩm. Ag
 - Regression Testing
 
 ### Tools
-- **Graphify**: Query test coverage maps, update bug tracking, link tests to requirements
+- **Workflow MCP + Graphify**: `wf_step_context()` + `query_graph()` cho code structure (step 7)
 - **GitNexus**: Test branch management, bug fix PR tracking, regression baseline
 - Playwright/Cypress: E2E automation
 - Postman/Newman: API testing
@@ -78,46 +78,35 @@ QA Agent chịu trách nhiệm toàn bộ quality assurance cho sản phẩm. Ag
 - BrowserStack/LambdaTest: Cross-browser testing
 - Allure: Test reporting
 
-## Graphify Integration
+## Context Loading
 
 ### Khi Bắt Đầu Step 7
 ```
-# Load context từ tất cả previous steps
-graphify query "requirement:*" --filter "status=implemented"
-graphify query "api:endpoints" --filter "status=implemented"
-graphify query "design:screens" --filter "status=implemented"
-graphify query "architecture:integration-points"
+wf_step_context()              ← workflow context: prior decisions, acceptance criteria, blockers
+gitnexus_get_architecture()    ← codebase structure để biết scope test
+query_graph("integration points")   ← code graph: entry points cần test
+```
+> Graphify (`query_graph`) cho code structure — không có requirement/test data.
+> Acceptance criteria đọc từ `workflows/steps/01-requirements/acceptance-criteria.md`.
+
+### Code Graph Queries Hữu Ích (step 7)
+```
+query_graph("API endpoints")
+query_graph("authentication flow")
+query_graph("error handling paths")
+get_neighbors("ServiceName")    ← dependencies cần integration test
 ```
 
-### Trong Quá Trình Testing
-```
-# Track test coverage theo requirements
-graphify link "test-case:{id}" "requirement:us-{id}" --relation "validates"
-graphify update "test-case:{id}" \
-  --status "pass|fail|blocked|not-run" \
-  --execution-date "{date}" \
-  --environment "{env}"
-
-# Log defects
-graphify update "defect:{id}" \
-  --severity "critical|high|medium|low" \
-  --status "open|in-progress|resolved|closed" \
-  --linked-test "test-case:{id}" \
-  --linked-requirement "requirement:us-{id}"
-
-# Track quality metrics
-graphify update "quality:metrics" \
-  --test-coverage "{percentage}" \
-  --pass-rate "{percentage}" \
-  --open-critical "{count}" \
-  --open-high "{count}"
-```
+### Lưu QA Output
+Ghi vào file chuẩn:
+- `workflows/steps/07-qa/test-plan.md`
+- `workflows/steps/07-qa/test-results.md`
+- `workflows/steps/07-qa/defects.md`
 
 ### Sau Khi Hoàn Thành Step 7
-```
-graphify snapshot "qa-testing-v1"
-graphify update "step:qa-testing" --status "completed"
-graphify update "project:quality-gate" --status "passed|failed" --details "{summary}"
+```bash
+flowctl collect    # tổng hợp decisions + blockers
+flowctl approve    # sau khi human approve
 ```
 
 ## GitNexus Integration
@@ -483,7 +472,7 @@ export default function () {
 - [ ] Accessibility audit passed
 - [ ] Test report hoàn chỉnh
 - [ ] Traceability matrix cập nhật đầy đủ
-- [ ] Graphify updated với quality metrics
+- [ ] `flowctl collect` chạy thành công, test results ghi vào `workflows/steps/07-qa/`
 - [ ] Go/No-Go recommendation document created
 
 ## Liên Kết

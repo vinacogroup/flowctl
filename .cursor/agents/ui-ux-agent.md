@@ -55,52 +55,32 @@ UI/UX Designer Agent chịu trách nhiệm toàn bộ user experience và visual
 - Accessibility Design (WCAG 2.1)
 
 ### Tools Used
-- **Graphify**: Query requirements, update design decisions và component inventory
+- **Workflow MCP**: `wf_step_context()` cho workflow context; không dùng Graphify (design step, no code)
 - **GitNexus**: Track design changes, link design versions to code PRs
 - Figma: Primary design tool (wireframes, mockups, prototypes, design system)
 - Maze/UserTesting: Usability testing
 - Lottie: Animation specifications
 
-## Graphify Integration
+## Context Loading
 
 ### Khi Bắt Đầu Step 3
 ```
-# Load requirements và user context
-graphify query "requirement:*" --filter "component=ui"
-graphify query "user:personas"
-graphify query "user:journey-maps"
-graphify query "project:brand-guidelines"
+wf_step_context()    ← workflow context: prior decisions từ step 1-2, blockers
 ```
+> Step 3 là design step — không có code → Graphify không áp dụng.
+> Đọc PRD từ `workflows/steps/01-requirements/` và architecture từ `workflows/steps/02-system-design/`.
 
-### Trong Quá Trình Design
-```
-# Đăng ký design components
-graphify update "design:component:{name}" \
-  --type "atom|molecule|organism|template|page" \
-  --figma-url "{url}" \
-  --status "draft|review|approved"
-
-# Track design tokens
-graphify update "design:token:{name}" \
-  --value "{value}" \
-  --category "color|spacing|typography|shadow|radius"
-
-# Link design đến requirements
-graphify link "design:screen:{name}" "requirement:us-{id}" --relation "implements"
-graphify link "design:component:{name}" "design:screen:{name}" --relation "used-in"
-
-# Document design decisions
-graphify update "design-decision:{id}" \
-  --context "{why this design}" \
-  --alternatives "{what else was considered}" \
-  --chosen "{chosen approach}"
-```
+### Lưu Design Output
+Ghi vào file markdown/JSON chuẩn:
+- `workflows/steps/03-ui-ux/design-system.md` ← component inventory
+- `workflows/steps/03-ui-ux/design-tokens.json` ← colors, spacing, typography
+- `workflows/steps/03-ui-ux/screens/` ← screen specs per feature
+- `workflows/steps/03-ui-ux/design-decisions.md` ← context + rationale
 
 ### Sau Khi Hoàn Thành Step 3
-```
-graphify snapshot "design-system-v1"
-graphify update "step:ui-ux-design" --status "completed"
-graphify update "design:figma-url" --value "{master-file-url}"
+```bash
+flowctl collect    # tổng hợp decisions + blockers
+flowctl approve    # sau khi human approve
 ```
 
 ## GitNexus Integration
@@ -343,7 +323,7 @@ gitnexus review --pr "{pr-number}" \
 - [ ] Design tokens exported và ready cho dev handoff
 - [ ] Frontend Dev Agent review feasibility
 - [ ] PM review và confirm design meets requirements
-- [ ] Graphify updated với design inventory
+- [ ] Design docs ghi vào `workflows/steps/03-ui-ux/`
 - [ ] Step summary document hoàn chỉnh
 
 ## Liên Kết

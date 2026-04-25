@@ -60,50 +60,37 @@ DevOps Agent chịu trách nhiệm toàn bộ infrastructure, CI/CD pipelines, d
 - Security: Trivy, Snyk, OWASP ZAP
 
 ### Tools Used
-- **Graphify**: Query infrastructure topology, update deployment status
+- **Workflow MCP + Graphify**: `wf_step_context()` + `query_graph()` cho code structure (step 8)
 - **GitNexus**: Infrastructure-as-code versioning, deployment PRs, rollback tracking
 
-## Graphify Integration
+## Context Loading
 
 ### Khi Bắt Đầu Step 8
 ```
-# Load toàn bộ system context
-graphify query "architecture:infrastructure"
-graphify query "service:*" --filter "status=ready-for-deployment"
-graphify query "requirement:non-functional" --filter "type=performance,availability"
-graphify query "security:requirements"
+wf_step_context()              ← workflow context: prior decisions, NFRs, blockers
+gitnexus_get_architecture()    ← codebase structure: services cần deploy
+query_graph("service entry points")   ← code graph: services và dependencies
+```
+> Non-functional requirements đọc từ `workflows/steps/01-requirements/` hoặc `docs/`.
+> Graphify (`query_graph`) trả lời code structure questions, không có infra/deployment data.
+
+### Code Graph Queries Hữu Ích (step 8)
+```
+query_graph("service dependencies")     ← thứ tự deploy
+query_graph("external integrations")    ← services cần env vars
+god_nodes()                             ← high-impact services (deploy cẩn thận)
 ```
 
-### Trong Quá Trình Setup Infrastructure
-```
-# Đăng ký infrastructure components
-graphify update "infra:cluster" \
-  --provider "aws-eks|gke|aks" \
-  --region "{region}" \
-  --version "{k8s-version}"
-
-graphify update "infra:database" \
-  --type "postgres|mysql|mongo" \
-  --ha "true|false" \
-  --backup-schedule "{cron}"
-
-# Track deployment pipeline
-graphify update "cicd:pipeline:{name}" \
-  --stages "{list-of-stages}" \
-  --trigger "{push|tag|manual}"
-
-# Document environments
-graphify update "env:production" \
-  --url "{base-url}" \
-  --region "{region}" \
-  --deployment-strategy "blue-green|canary|rolling"
-```
+### Lưu Infrastructure Output
+Ghi vào file chuẩn:
+- `infra/` hoặc `k8s/` ← IaC files
+- `workflows/steps/08-devops/deployment-plan.md`
+- `docs/runbooks/` ← operational runbooks
 
 ### Sau Khi Hoàn Thành Step 8
-```
-graphify snapshot "infrastructure-production-v1"
-graphify update "step:devops-deployment" --status "completed"
-graphify update "project:deployed" --environment "production" --url "{url}"
+```bash
+flowctl collect    # tổng hợp decisions + blockers
+flowctl approve    # sau khi human approve
 ```
 
 ## GitNexus Integration
@@ -445,7 +432,7 @@ spec:
 7. Monitor production deployment
 8. Verify all health checks
 9. Run post-deployment validation suite
-10. Update Graphify với deployment status
+10. Ghi deployment status vào `workflows/steps/08-devops/deployment-log.md`
 
 ### Rollback Procedure
 ```bash
@@ -493,7 +480,7 @@ gitnexus commit --type "revert" --scope "deploy" \
 ### Documentation
 - [ ] Runbook hoàn chỉnh
 - [ ] Architecture diagram updated
-- [ ] Graphify updated với infrastructure topology
+- [ ] `flowctl collect` chạy thành công, decisions/blockers ghi vào state
 
 ## Liên Kết
 

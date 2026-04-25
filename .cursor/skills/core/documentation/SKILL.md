@@ -634,27 +634,20 @@ Xem `.cursor/agents/devops-agent.md` và `workflows/steps/08-devops-deployment.m
 {License type} - xem [LICENSE](LICENSE) để biết thêm.
 ```
 
-## 7. Documentation trong Graphify
+## 7. Documentation Tracking
+
+Lưu documentation status trong step summary và flowctl state:
 
 ```bash
-# Track documentation completeness
-graphify update "docs:api" \
-  --completeness "{percentage}%" \
-  --last-updated "{date}"
+# Khi hoàn thành documentation
+flowctl add-decision "docs-complete: API={api_pct}%, ADRs={adr_count}, README=updated"
 
-graphify update "docs:adr" \
-  --count "{number-of-adrs}" \
-  --pending-review "{count}"
-
-graphify update "docs:readme" \
-  --status "complete|needs-update"
-
-# Link documentation đến components
-graphify link "docs:api:endpoint-{id}" "api:endpoint:{id}" \
-  --relation "documents"
-
-graphify link "adr:{id}" "architecture:{component}" \
-  --relation "documents"
+# Cấu trúc docs chuẩn
+docs/
+  api/openapi.yaml              ← API spec
+  adr/ADR-{id}-{title}.md      ← Architecture decisions
+  runbooks/                     ← Operational guides
+workflows/steps/{N}-*/          ← Step-level docs
 ```
 
 ## 8. Liên Kết

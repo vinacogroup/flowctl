@@ -150,15 +150,13 @@ for role in roles:
 
 ## 🔍 Context Loading — MANDATORY (thực hiện theo thứ tự, dừng khi đủ thông tin)
 
-### Layer 1 — Graphify queries (cheapest, ~300 tokens each)
+### Layer 1 — Workflow context (cheapest, ~300 tokens)
 ```
-graphify_query("step:{int(step)-1}:outcomes")
-graphify_query("project:constraints")
-graphify_query("open:blockers:{role}")
-graphify_query("aligned-plan:step:{step}")
+wf_step_context()    ← state + decisions + blockers trong 1 call
+wf_state()           ← nếu chỉ cần step/status hiện tại
 ```
 
-### Layer 2 — GitNexus (chỉ dùng cho code tasks)
+### Layer 2 — GitNexus (chỉ dùng cho code tasks — steps 4-8)
 """
     if is_code_step:
         brief += f"""```
@@ -170,7 +168,12 @@ gitnexus_find_related("{role}")
         brief += "*(Skip — non-code step)*\n"
 
     brief += f"""
-### Layer 3 — File reads (fallback, chỉ khi Layer 1+2 không đủ)
+### Layer 3 — Code graph (steps 4-8 only, code structure questions)
+```
+query_graph("tên component/flow cần hiểu")   ← chỉ cho code structure
+```
+
+### Layer 4 — File reads (fallback, chỉ khi Layer 1-3 không đủ)
 """
     if digest_rel:
         brief += f"- @{digest_rel} ← context digest (War Room output + prior decisions)\n"
@@ -188,11 +191,11 @@ gitnexus_find_related("{role}")
 
 ## 📋 Nhiệm vụ của @{role}
 
-1. Load context via layers trên (Layer 1 → Layer 2 → Layer 3, dừng khi đủ)
+1. Load context via layers trên (Layer 1 → Layer 2 → Layer 3 → Layer 4, dừng khi đủ)
 2. Thực hiện công việc scope của @{role} cho step {step}
 3. Mọi quyết định quan trọng → ghi vào report (DECISION section)
 4. Nếu bị block → ghi vào NEEDS_SPECIALIST hoặc BLOCKER (KHÔNG dừng flowctl)
-5. Ghi kết quả vào report, update graph
+5. Ghi kết quả vào report với EVIDENCE: links thực tế
 
 ---
 
@@ -214,15 +217,6 @@ Ghi vào: `{report_path.relative_to(repo_root)}`
 
 ## BLOCKERS
 - BLOCKER: [mô tả] / NONE
-
-## GRAPH_UPDATES (mandatory — chạy sau khi xong)
-```
-graphify_update_node("step:{step}:{role}:done", {{
-  deliverables: [...],
-  key_decisions: [...],
-  blockers: [...]
-}})
-```
 
 ## NEEDS_SPECIALIST (optional — nếu cần mercenary)
 - type: researcher|security-auditor|ux-validator|tech-validator|data-analyst

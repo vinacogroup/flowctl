@@ -86,13 +86,39 @@ index_codebase() {
 
   cd "$REPO_ROOT"
 
-  # Build knowledge graph và export ra .graphify/
-  python3 -m graphify index . \
-    --output ".graphify/graph.json" \
-    --format json \
+  # Tạo .graphifyignore nếu chưa có (exclude non-code files)
+  local ignore_file="$REPO_ROOT/.graphifyignore"
+  if [[ ! -f "$ignore_file" ]]; then
+    cat > "$ignore_file" <<'EOF'
+# flowctl: exclude workflow/config files from code graph
+CLAUDE.md
+AGENTS.md
+*.md
+.cursor/
+workflows/
+plans/
+graphify-out/
+scripts/
+*.sh
+*.json
+*.yaml
+*.yml
+EOF
+    log ".graphifyignore đã tạo"
+  fi
+
+  # Install git hooks for auto re-index on commit
+  if python3 -c "import graphify" &>/dev/null 2>&1; then
+    python3 -m graphify hook install 2>/dev/null \
+      && log "Graphify git hooks đã cài" \
+      || warn "graphify hook install thất bại — graph sẽ không tự cập nhật khi commit"
+  fi
+
+  # Build knowledge graph → graphify-out/graph.json (output path cố định của graphify)
+  python3 -m graphify update . \
     2>/dev/null \
-    && log "Graphify index hoàn thành → .graphify/graph.json" \
-    || warn "graphify index thất bại — sẽ build lại khi chạy MCP server"
+    && log "Graphify index hoàn thành → graphify-out/graph.json" \
+    || warn "graphify index thất bại — chạy thủ công: python3 -m graphify update ."
 }
 
 # ── 5. Tạo .cursor/mcp.json ──────────────────────────────────
@@ -120,6 +146,13 @@ configure_cursor_mcp() {
     MCP_STATUS=unchanged)   log ".cursor/mcp.json đã đồng bộ (không thiếu server flowctl)" ;;
     *) log ".cursor/mcp.json đã cập nhật" ;;
   esac
+
+  # Install graphify Cursor integration (adds MCP server entry for Cursor)
+  if python3 -c "import graphify" &>/dev/null 2>&1; then
+    python3 -m graphify cursor install 2>/dev/null \
+      && log "Graphify Cursor MCP đã cài" \
+      || warn "graphify cursor install thất bại — thêm thủ công nếu cần"
+  fi
 }
 
 # ── 6. Tạo .gitignore entries ────────────────────────────────
@@ -133,7 +166,8 @@ update_gitignore() {
 
   # Thêm entries nếu chưa có
   local entries=(
-    ".graphify/cache/"
+    "graphify-out/cache/"
+    "graphify-out/memory/"
     ".gitnexus/"
     "node_modules/"
     "__pycache__/"
@@ -146,9 +180,9 @@ update_gitignore() {
     grep -qxF "$entry" "$GITIGNORE" || echo "$entry" >> "$GITIGNORE"
   done
 
-  # Nhưng track graph output
-  grep -qxF "!.graphify/graph.json" "$GITIGNORE" \
-    || echo "!.graphify/graph.json" >> "$GITIGNORE"
+  # Track graph output nhưng không track cache/memory
+  grep -qxF "!graphify-out/graph.json" "$GITIGNORE" \
+    || echo "!graphify-out/graph.json" >> "$GITIGNORE"
 
   log ".gitignore đã cập nhật"
 }
@@ -157,12 +191,12 @@ update_gitignore() {
 start_mcp_servers() {
   info "Khởi động MCP servers..."
 
-  # Graphify MCP server
+  # Graphify MCP server — chạy qua stdio (Cursor tự quản lý process)
+  # Không cần start thủ công, mcp.json đã cấu hình sẵn
   if python3 -c "import graphify" &>/dev/null; then
-    python3 -m graphify.serve --root "$REPO_ROOT" \
-      --port 7331 --background 2>/dev/null \
-      && log "Graphify MCP server đang chạy tại :7331" \
-      || warn "Graphify MCP server không tự khởi động — Cursor sẽ tự start khi cần"
+    log "Graphify đã cài — Cursor sẽ tự start MCP server từ mcp.json"
+  else
+    warn "Graphify chưa cài — chạy: pip install graphifyy"
   fi
 
   log "MCP servers đã được cấu hình. Cursor sẽ tự khởi động khi cần."
@@ -184,7 +218,7 @@ print_summary() {
   echo -e "  • CLAUDE.md          — Orchestration guide cho agents"
   echo -e "  • flowctl-state.json — Trạng thái flowctl hiện tại"
   echo -e "  • .cursor/mcp.json   — MCP server configuration"
-  echo -e "  • .graphify/graph.json — Codebase knowledge graph"
+  echo -e "  • graphify-out/graph.json — Codebase knowledge graph"
   echo ""
 }
 

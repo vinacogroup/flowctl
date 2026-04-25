@@ -13,4 +13,9 @@ __pycache__/
 .claude/worktrees/
 graphify-out/
 .neuralmemory/
-plans/
+plans/.graphify/cache/
+.gitnexus/
+*.pyc
+.env
+.env.local
+!.graphify/graph.json
