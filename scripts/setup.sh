@@ -80,7 +80,32 @@ install_gitnexus() {
   log "GitNexus sẵn sàng (qua npx)"
 }
 
-# ── 4. Index codebase với Graphify ───────────────────────────
+# ── 4. Install flowctl MCP dependencies ─────────────────────
+install_mcp_deps() {
+  if ! command -v node &>/dev/null || ! command -v npm &>/dev/null; then
+    warn "Bỏ qua MCP deps (Node.js/npm không có sẵn)"
+    return 0
+  fi
+
+  # Chỉ cần chạy khi dùng từ source repo (không phải global install).
+  # Khi install qua `npm install -g @vinacogroup/flowctl`, npm đã cài
+  # @modelcontextprotocol/sdk tự động — không cần bước này.
+  # Resolve flowctl package dir từ vị trí script này (scripts/setup.sh → parent = package root)
+  local flowctl_pkg_dir
+  flowctl_pkg_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.."
+  local pkg_json="$flowctl_pkg_dir/package.json"
+  local node_modules="$flowctl_pkg_dir/node_modules/@modelcontextprotocol"
+  if [[ -f "$pkg_json" && ! -d "$node_modules" ]]; then
+    info "Cài đặt MCP SDK dependencies (dev/source mode)..."
+    npm install --prefix "$flowctl_pkg_dir" --prefer-offline 2>/dev/null \
+      && log "MCP dependencies đã cài xong" \
+      || warn "npm install thất bại — chạy thủ công: cd $flowctl_pkg_dir && npm install"
+  else
+    log "MCP dependencies OK (skip)"
+  fi
+}
+
+# ── 5. Index codebase với Graphify ───────────────────────────
 index_codebase() {
   info "Đang index codebase với Graphify..."
 
@@ -235,6 +260,7 @@ main() {
       ;;
     all|*)
       check_prerequisites
+      install_mcp_deps
       install_graphify
       install_gitnexus
       [[ "$MODE" != "--no-index" ]] && index_codebase

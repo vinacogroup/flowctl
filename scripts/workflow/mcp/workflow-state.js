@@ -12,8 +12,9 @@ import { existsSync, readFileSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
+// workflow-state.js lives at scripts/workflow/mcp/ → 3 dirs up to project root
 const __filename = fileURLToPath(import.meta.url);
-const REPO_ROOT = resolve(dirname(__filename), '..');
+const REPO_ROOT = resolve(dirname(__filename), '..', '..', '..');
 const STATE_FILE = join(REPO_ROOT, 'flowctl-state.json');
 function runWorkflowCommand(args) {
   const out = execFileSync('flowctl', args.map((arg) => String(arg)), {

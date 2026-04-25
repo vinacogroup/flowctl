@@ -14,8 +14,9 @@ import { join, resolve, relative, extname } from 'path';
 import { fileURLToPath } from 'url';
 
 // ── Paths ──────────────────────────────────────────────────────
+// shell-proxy.js lives at scripts/workflow/mcp/ → 3 levels up to project root
 const __file      = fileURLToPath(import.meta.url);
-const REPO        = resolve(__file, '..', '..');
+const REPO        = resolve(__file, '..', '..', '..', '..');
 const CACHE       = join(REPO, '.cache', 'mcp');
 const GEN_FILE    = join(CACHE, '_gen.json');
 const BASELINE_F  = join(CACHE, '_baselines.json');
