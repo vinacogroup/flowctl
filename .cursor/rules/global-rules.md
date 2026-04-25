@@ -61,6 +61,10 @@ EVIDENCE: figma_url — https://figma.com/...
 
 ## 2. Quy Tắc Sử Dụng Graphify
 
+> **⚠️ Lazy loading rule**: Chỉ query Graphify khi graph có data (> 10 nodes). Nếu graph trống
+> hoặc sparse → bỏ qua Layer 1, đọc file trực tiếp. Dùng `flowctl audit-tokens` để kiểm tra
+> trạng thái graph. Query graph rỗng = overhead thuần túy.
+
 ### 2.1 Khi Nào Phải Update Graphify
 - ✅ Khi định nghĩa requirement mới hoặc cập nhật requirement
 - ✅ Khi đưa ra architecture decision (ADR)
@@ -142,6 +146,11 @@ graphify snapshot "{step-name}-{date}"
 ```
 
 ## 3. Quy Tắc Sử Dụng GitNexus
+
+> **⚠️ Scope restriction**: GitNexus MCP tools (`gitnexus_*`) chỉ được phép dùng ở **steps 4-8**
+> (code steps: Backend Dev, Frontend Dev, Integration, QA, DevOps). Steps 1-3 không có
+> codebase để index — gọi GitNexus ở đây là overhead lãng phí. Agent tự động skip nếu
+> `current_step < 4`.
 
 ### 3.1 Branch Strategy (Gitflow)
 ```

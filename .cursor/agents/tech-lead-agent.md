@@ -269,3 +269,16 @@ graph TB
 - Xem: `.cursor/skills/gitnexus-integration.md` để sử dụng GitNexus code review
 - Xem: `.cursor/skills/code-review-skill.md` để biết code review standards
 - Xem: `.cursor/rules/review-rules.md` để biết review và approval process
+
+## Skills Available
+
+> **Skill-guard**: Tech Lead chỉ được load các skills trong danh sách này.
+
+| Skill | Khi dùng |
+|-------|----------|
+| `architecture-decision` | Viết ADR, so sánh options, system design trade-offs |
+| `api-design` | Thiết kế API contracts, OpenAPI spec, endpoint review |
+| `security-review` | OWASP checklist, auth review, dependency audit |
+| `code-review` | Pre-merge review, refactor assessment |
+| `gitnexus-integration` | Code intelligence (Steps 4-8 only) |
+| `graphify-integration` | Query/update knowledge graph (chỉ khi graph > 10 nodes) |

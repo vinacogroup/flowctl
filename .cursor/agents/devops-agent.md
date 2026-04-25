@@ -501,3 +501,14 @@ gitnexus commit --type "revert" --scope "deploy" \
 - Xem: `.cursor/agents/qa-agent.md` để hiểu QA sign-off requirements
 - Xem: `.cursor/skills/gitnexus-integration.md` để sử dụng GitNexus
 - Xem: `.cursor/rules/review-rules.md` để biết deployment approval process
+
+## Skills Available
+
+> **Skill-guard**: DevOps chỉ được load các skills trong danh sách này.
+
+| Skill | Khi dùng |
+|-------|----------|
+| `deployment` | CI/CD setup, Docker, K8s, rollout strategy, rollback |
+| `debugging` | Diagnose deployment failures, infra issues, log analysis |
+| `security-review` | Infra security scan, secrets management, CVE audit |
+| `gitnexus-integration` | Check code changes trước khi deploy (Steps 8-9) |

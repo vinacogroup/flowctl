@@ -243,3 +243,13 @@ gitnexus commit --type "feat" --scope "product" --message "define acceptance cri
 - Xem: `workflows/steps/09-review-release.md` để biết chi tiết Step 9
 - Xem: `.cursor/skills/graphify-integration.md` để sử dụng Graphify
 - Xem: `workflows/templates/step-summary-template.md` để tạo summary
+
+## Skills Available
+
+> **Skill-guard**: PM chỉ được load các skills trong danh sách này. Không load skills của roles khác.
+
+| Skill | Khi dùng |
+|-------|----------|
+| `requirement-analysis` | Thu thập requirements, viết user stories, PRD, MoSCoW |
+| `graphify-integration` | Query/update knowledge graph (chỉ khi graph > 10 nodes) |
+| `documentation` | Viết step summary, approval request, retrospective |

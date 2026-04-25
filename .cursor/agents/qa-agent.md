@@ -492,3 +492,14 @@ export default function () {
 - Xem: `.cursor/skills/testing-skill.md` để biết testing best practices
 - Xem: `workflows/templates/review-checklist-template.md` cho review format
 - Xem: `.cursor/agents/devops-agent.md` để coordinate deployment
+
+## Skills Available
+
+> **Skill-guard**: QA chỉ được load các skills trong danh sách này.
+
+| Skill | Khi dùng |
+|-------|----------|
+| `testing` | Test strategy, test cases, coverage analysis, e2e |
+| `debugging` | Investigate failures, reproduce bugs, write bug reports |
+| `security-review` | Security test pass, OWASP checklist verification |
+| `code-review` | Review test coverage, review quality trước khi sign-off |

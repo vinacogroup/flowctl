@@ -414,3 +414,14 @@ describe('Button', () => {
 - Xem: `.cursor/agents/ui-ux-agent.md` để hiểu design handoff process
 - Xem: `.cursor/skills/testing-skill.md` để biết testing strategy
 - Xem: `.cursor/skills/gitnexus-integration.md` để sử dụng GitNexus
+
+## Skills Available
+
+> **Skill-guard**: Frontend Dev chỉ được load các skills trong danh sách này.
+
+| Skill | Khi dùng |
+|-------|----------|
+| `debugging` | Debug UI issues, trace network errors, console errors |
+| `testing` | Component tests, e2e tests, visual regression |
+| `code-review` | Self-review trước khi submit, review từ tech-lead |
+| `gitnexus-integration` | Impact analysis trước khi sửa component (Steps 4-8) |

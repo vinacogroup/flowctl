@@ -340,3 +340,15 @@ describe('ResourceService', () => {
 - Xem: `.cursor/agents/tech-lead-agent.md` để biết code review process
 - Xem: `.cursor/skills/gitnexus-integration.md` để sử dụng GitNexus
 - Xem: `.cursor/skills/testing-skill.md` để biết testing best practices
+
+## Skills Available
+
+> **Skill-guard**: Backend Dev chỉ được load các skills trong danh sách này.
+
+| Skill | Khi dùng |
+|-------|----------|
+| `api-design` | Implement endpoints, validate request/response format |
+| `debugging` | Investigate errors, trace failures, write bug reports |
+| `security-review` | OWASP checks khi implement auth/data handling |
+| `testing` | Unit tests, integration tests, test strategy |
+| `gitnexus-integration` | Impact analysis trước khi sửa code (Steps 4-8) |

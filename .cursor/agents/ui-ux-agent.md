@@ -352,3 +352,13 @@ gitnexus review --pr "{pr-number}" \
 - Xem: `.cursor/agents/frontend-dev-agent.md` để hiểu implementation requirements
 - Xem: `.cursor/skills/graphify-integration.md` để sử dụng Graphify
 - Xem: `workflows/templates/review-checklist-template.md` cho design review format
+
+## Skills Available
+
+> **Skill-guard**: UI/UX chỉ được load các skills trong danh sách này.
+
+| Skill | Khi dùng |
+|-------|----------|
+| `ux-research` | User interviews, personas, user flows, usability testing |
+| `documentation` | Design specs, handoff notes, component documentation |
+| `graphify-integration` | Query project requirements graph (chỉ khi graph > 10 nodes) |
