@@ -9,20 +9,44 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { execSync } from 'child_process';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync, readdirSync, appendFileSync, renameSync } from 'fs';
-import { join, resolve, relative, extname } from 'path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync, readdirSync, appendFileSync, renameSync, openSync, closeSync, unlinkSync } from 'fs';
+import { join, resolve, relative, extname, basename } from 'path';
 import { fileURLToPath } from 'url';
+import { createHash } from 'crypto';
+import { homedir } from 'os';
 
 // ── Paths ──────────────────────────────────────────────────────
-// shell-proxy.js lives at scripts/workflow/mcp/ → 3 levels up to project root
+// REPO = project root where Cursor opened the workspace.
+// Cursor always spawns MCP servers with cwd = project root, so process.cwd()
+// is reliable regardless of where flowctl is installed (local, global, npm link).
+// Fallback: FLOWCTL_PROJECT_ROOT env var for manual / non-Cursor invocations.
 const __file      = fileURLToPath(import.meta.url);
-const REPO        = resolve(__file, '..', '..', '..', '..');
+const REPO        = resolve(process.env.FLOWCTL_PROJECT_ROOT || process.cwd());
 const CACHE       = join(REPO, '.cache', 'mcp');
 const GEN_FILE    = join(CACHE, '_gen.json');
 const BASELINE_F  = join(CACHE, '_baselines.json');
 const EVENTS_F    = join(CACHE, 'events.jsonl');
 const STATS_F     = join(CACHE, 'session-stats.json');
 const STATE       = join(REPO, 'flowctl-state.json');
+const FLOWCTL_HOME = join(homedir(), '.flowctl');
+const REGISTRY_F   = join(FLOWCTL_HOME, 'registry.json');
+
+// ── Project identity — read once at startup ────────────────────
+function readProjectIdentity() {
+  try {
+    const s = existsSync(STATE) ? JSON.parse(readFileSync(STATE, 'utf8')) : {};
+    return {
+      id:   s.flow_id      || `path-${createHash('sha1').update(REPO).digest('hex').slice(0, 8)}`,
+      name: s.project_name || basename(REPO),
+    };
+  } catch {
+    return { id: `path-${createHash('sha1').update(REPO).digest('hex').slice(0, 8)}`, name: basename(REPO) };
+  }
+}
+
+const _proj        = readProjectIdentity();
+const PROJECT_ID   = _proj.id;
+const PROJECT_NAME = _proj.name;
 
 // Anthropic Sonnet 4.6 pricing (per 1M tokens)
 const PRICE = { input: 3.0, output: 15.0 };
@@ -89,6 +113,85 @@ function getBaseline(tool) {
   return b[tool]?.avg ?? FALLBACK[tool] ?? 200;
 }
 
+// ── Global registry ────────────────────────────────────────────
+
+function ensureFlowctlHome() {
+  if (!existsSync(FLOWCTL_HOME)) mkdirSync(FLOWCTL_HOME, { recursive: true });
+}
+
+function readRegistry() {
+  try {
+    return existsSync(REGISTRY_F)
+      ? JSON.parse(readFileSync(REGISTRY_F, 'utf8'))
+      : { version: 1, projects: {} };
+  } catch { return { version: 1, projects: {} }; }
+}
+
+// Synchronous busy-wait sleep — safe on Node.js main thread (no Atomics.wait)
+function sleepMs(ms) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) { /* spin */ }
+}
+
+function registryUpsert(extra = {}) {
+  ensureFlowctlHome();
+  const lockFile = REGISTRY_F + '.lock';
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      // Atomic exclusive lock: openSync 'wx' (O_EXCL) — fails if file already exists
+      const fd = openSync(lockFile, 'wx');
+      closeSync(fd);
+      try {
+        const registry = readRegistry();
+
+        // Read fresh step/status from state file
+        let meta = {};
+        try {
+          const s = JSON.parse(readFileSync(STATE, 'utf8'));
+          const openBlockers = Object.values(s.steps ?? {})
+            .flatMap(st => st.blockers ?? [])
+            .filter(b => !b.resolved).length;
+          meta = {
+            current_step:   s.current_step    ?? 0,
+            overall_status: s.overall_status  ?? 'unknown',
+            project_name:   s.project_name    ?? PROJECT_NAME,
+            open_blockers:  openBlockers,
+          };
+        } catch { /* state unreadable — use existing meta */ }
+
+        registry.projects[PROJECT_ID] = {
+          project_id:   PROJECT_ID,
+          project_name: PROJECT_NAME,
+          path:         REPO,
+          cache_dir:    CACHE,
+          last_seen:    new Date().toISOString(),
+          ...meta,
+          ...extra,
+        };
+
+        // Prune entries not seen in 30 days
+        const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        for (const [id, p] of Object.entries(registry.projects)) {
+          if (new Date(p.last_seen).getTime() < cutoff) delete registry.projects[id];
+        }
+
+        // Atomic write: temp file + rename (POSIX-atomic)
+        const tmp = REGISTRY_F + '.tmp.' + process.pid;
+        writeFileSync(tmp, JSON.stringify(registry, null, 2));
+        renameSync(tmp, REGISTRY_F);
+      } finally {
+        try { unlinkSync(lockFile); } catch { /* ignore */ }
+      }
+      return; // success
+    } catch (e) {
+      if (e.code !== 'EEXIST') return; // unexpected error — fail silently
+      sleepMs(10 * Math.pow(2, attempt)); // 10ms, 20ms, 40ms, 80ms, 160ms backoff
+    }
+  }
+  // All retries exhausted — skip (registry is best-effort)
+}
+
 // ── Event logging ──────────────────────────────────────────────
 
 function ensureCache() {
@@ -105,8 +208,41 @@ function logEvent(event) {
       writeFileSync(EVENTS_F, lines.slice(-800).join('\n') + '\n');
     }
   } catch { /* ignore */ }
-  appendFileSync(EVENTS_F, JSON.stringify({ ...event, ts: new Date().toISOString() }) + '\n');
+  appendFileSync(EVENTS_F, JSON.stringify({ ...event, project_id: PROJECT_ID, project_name: PROJECT_NAME, ts: new Date().toISOString() }) + '\n');
   updateSessionStats(event);
+}
+
+// Reset current_session on each shell-proxy startup (called once at module init)
+function initSessionStats() {
+  ensureCache();
+  let stats = {};
+  try { stats = existsSync(STATS_F) ? JSON.parse(readFileSync(STATS_F, 'utf8')) : {}; }
+  catch { stats = {}; }
+  // Always reset current_session on startup — it tracks only this process lifetime
+  stats.current_session = { session_start: new Date().toISOString(), consumed: 0, saved: 0 };
+  // Ensure all_time exists (migration from flat schema)
+  if (!stats.all_time && stats.total_consumed_tokens !== undefined) {
+    // Migrate flat stats to new schema
+    stats.all_time = {
+      total_consumed_tokens: stats.total_consumed_tokens || 0,
+      total_saved_tokens:    stats.total_saved_tokens    || 0,
+      total_cost_usd:        stats.total_cost_usd        || 0,
+      total_saved_usd:       stats.total_saved_usd       || 0,
+      bash_waste_tokens:     stats.bash_waste_tokens     || 0,
+      tools:                 stats.tools                 || {},
+    };
+    delete stats.total_consumed_tokens;
+    delete stats.total_saved_tokens;
+    delete stats.total_cost_usd;
+    delete stats.total_saved_usd;
+    delete stats.bash_waste_tokens;
+    delete stats.session_start;
+    delete stats.last_event;
+    delete stats.tools;
+  }
+  stats.all_time = stats.all_time || {};
+  stats.daily    = stats.daily    || {};
+  writeFileSync(STATS_F, JSON.stringify(stats, null, 2));
 }
 
 function updateSessionStats(event) {
@@ -115,22 +251,42 @@ function updateSessionStats(event) {
   try { stats = existsSync(STATS_F) ? JSON.parse(readFileSync(STATS_F, 'utf8')) : {}; }
   catch { stats = {}; }
 
-  stats.session_start  = stats.session_start || new Date().toISOString();
-  stats.last_event     = new Date().toISOString();
-  stats.total_consumed_tokens = (stats.total_consumed_tokens || 0) + (event.output_tokens || 0);
-  stats.total_saved_tokens    = (stats.total_saved_tokens    || 0) + (event.saved_tokens  || 0);
-  stats.total_cost_usd = (stats.total_cost_usd || 0) + (event.cost_usd      || 0);
-  stats.total_saved_usd= (stats.total_saved_usd|| 0) + (event.saved_usd     || 0);
-  stats.bash_waste_tokens = (stats.bash_waste_tokens || 0) + (event.waste_tokens || 0);
+  const today = new Date().toISOString().slice(0, 10); // "2026-04-25"
 
-  // Per-tool stats
+  // all_time: never resets ─────────────────────────────────────
+  const at = stats.all_time = stats.all_time || {};
+  at.total_consumed_tokens = (at.total_consumed_tokens || 0) + (event.output_tokens || 0);
+  at.total_saved_tokens    = (at.total_saved_tokens    || 0) + (event.saved_tokens  || 0);
+  at.total_cost_usd        = (at.total_cost_usd        || 0) + (event.cost_usd      || 0);
+  at.total_saved_usd       = (at.total_saved_usd       || 0) + (event.saved_usd     || 0);
+  at.bash_waste_tokens     = (at.bash_waste_tokens     || 0) + (event.waste_tokens  || 0);
+
+  // per-tool in all_time — FIX: count saved for ALL calls, not just cache hits
   if (event.type === 'mcp') {
-    const t = stats.tools = stats.tools || {};
-    const ts = t[event.tool] = t[event.tool] || { calls: 0, hits: 0, misses: 0, saved: 0 };
+    const tools = at.tools = at.tools || {};
+    const ts = tools[event.tool] = tools[event.tool] || { calls: 0, hits: 0, misses: 0, saved: 0 };
     ts.calls++;
-    if (event.cache === 'hit') { ts.hits++; ts.saved += event.saved_tokens || 0; }
+    ts.saved += event.saved_tokens || 0;  // count on every call (hit or miss)
+    if (event.cache === 'hit') ts.hits++;
     else ts.misses++;
   }
+
+  // daily: keyed YYYY-MM-DD, pruned after 30 days ──────────────
+  const daily = stats.daily = stats.daily || {};
+  const day   = daily[today] = daily[today] || { consumed: 0, saved: 0, cost_usd: 0 };
+  day.consumed += event.output_tokens || 0;
+  day.saved    += event.saved_tokens  || 0;
+  day.cost_usd += event.cost_usd      || 0;
+
+  const cutoffDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  for (const d of Object.keys(daily)) { if (d < cutoffDate) delete daily[d]; }
+
+  // current_session: tracks only this shell-proxy process lifetime ──────────
+  const cs = stats.current_session = stats.current_session ||
+    { session_start: new Date().toISOString(), consumed: 0, saved: 0 };
+  cs.last_event = new Date().toISOString();
+  cs.consumed  += event.output_tokens || 0;
+  cs.saved     += event.saved_tokens  || 0;
 
   writeFileSync(STATS_F, JSON.stringify(stats, null, 2));
 }
@@ -541,6 +697,14 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     return { content: [{ type: 'text', text: JSON.stringify({ error: String(err.message) }) }], isError: true };
   }
 });
+
+// ── Registry startup + heartbeat ──────────────────────────────
+// Initialize stats: migrate legacy schema + reset current_session
+initSessionStats();
+// Register this project in ~/.flowctl/registry.json on startup
+registryUpsert();
+// Heartbeat: refresh last_seen + step/status every 60 seconds
+setInterval(() => registryUpsert(), 60_000).unref();
 
 const transport = new StdioServerTransport();
 await server.connect(transport);

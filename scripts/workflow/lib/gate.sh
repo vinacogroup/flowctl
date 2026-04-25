@@ -44,10 +44,20 @@ PY
 
 wf_evaluate_gate() {
   local step="$1"
-  local evidence_result
+  local evidence_result evidence_code
   if ! evidence_result=$(wf_evidence_verify_step "$step" 2>/dev/null); then
-    echo "GATE_FAIL|Evidence integrity failed: ${evidence_result#EVIDENCE_FAIL|}"
-    return 1
+    evidence_code="${evidence_result#EVIDENCE_FAIL|}"
+    if [[ "$evidence_code" == "manifest_missing" ]]; then
+      # manifest chỉ tồn tại nếu `flowctl collect` đã chạy.
+      # MICRO / brainstorm tasks không chạy collect → không có manifest → expected.
+      # Soft-warn và tiếp tục với policy checks, không hard-fail.
+      wf_warn "Evidence manifest chưa có cho step ${step} (collect chưa chạy) — bỏ qua integrity check"
+    else
+      # Manifest tồn tại nhưng verify thất bại (checksum/hash mismatch, unexpected files…)
+      # → artifact bị tamper hoặc corrupt → hard-fail
+      echo "GATE_FAIL|Evidence integrity failed: ${evidence_code}"
+      return 1
+    fi
   fi
   python3 - <<PY
 import json
@@ -82,7 +92,17 @@ blockers = step_obj.get("blockers", []) or []
 open_blockers = [b for b in blockers if not b.get("resolved")]
 
 reports_dir = repo_root / "workflows" / "dispatch" / f"step-{step}" / "reports"
-report_count = len(list(reports_dir.glob("*-report.md"))) if reports_dir.exists() else 0
+disk_reports = len(list(reports_dir.glob("*-report.md"))) if reports_dir.exists() else 0
+
+# Khi runtime files bị gitignored / chưa collect, disk_reports = 0 nhưng
+# state.json vẫn có deliverables ghi nhận reports đã được tạo.
+# Dùng state deliverables làm fallback để không block approve sai.
+state_report_deliverables = sum(
+    1 for d in deliverables
+    if isinstance(d, str) and d.rstrip().endswith("-report.md")
+)
+report_count = disk_reports if disk_reports > 0 else state_report_deliverables
+report_source = "disk" if disk_reports > 0 else "state"
 
 g = gate.get("defaults", {})
 allowed_statuses = g.get("allowed_step_statuses_for_approve", ["in_progress"])
@@ -112,7 +132,7 @@ if errors:
     raise SystemExit(1)
 
 print(
-    f"GATE_OK|step={step} reports={report_count} deliverables={len(deliverables)} "
+    f"GATE_OK|step={step} reports={report_count}({report_source}) deliverables={len(deliverables)} "
     f"decisions={len(decisions)} open_blockers={len(open_blockers)}"
 )
 PY

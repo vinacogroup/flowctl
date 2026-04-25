@@ -12,9 +12,10 @@ import { existsSync, readFileSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
-// workflow-state.js lives at scripts/workflow/mcp/ → 3 dirs up to project root
+// Use process.cwd() — Cursor always spawns MCP servers with cwd = project root.
+// This works regardless of whether flowctl is installed locally or globally.
 const __filename = fileURLToPath(import.meta.url);
-const REPO_ROOT = resolve(dirname(__filename), '..', '..', '..');
+const REPO_ROOT = resolve(process.env.FLOWCTL_PROJECT_ROOT || process.cwd());
 const STATE_FILE = join(REPO_ROOT, 'flowctl-state.json');
 function runWorkflowCommand(args) {
   const out = execFileSync('flowctl', args.map((arg) => String(arg)), {

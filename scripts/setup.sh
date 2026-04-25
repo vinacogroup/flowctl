@@ -49,14 +49,13 @@ install_graphify() {
   # Thử import trước — nếu đã có thì skip
   if python3 -c "import graphify" &>/dev/null; then
     log "Graphify đã được cài (skip)"
-    return 0
+  else
+    pip install graphifyy --quiet \
+      || pip3 install graphifyy --quiet \
+      || err "Không thể cài Graphify. Chạy thủ công: pip install graphifyy"
+    log "Graphify đã cài xong"
   fi
 
-  pip install graphifyy --quiet \
-    || pip3 install graphifyy --quiet \
-    || err "Không thể cài Graphify. Chạy thủ công: pip install graphifyy"
-
-  log "Graphify đã cài xong"
 }
 
 # ── 3. Install GitNexus ──────────────────────────────────────

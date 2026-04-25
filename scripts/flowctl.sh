@@ -227,7 +227,7 @@ cmd_init() {
   }
 
   python3 -c "
-import json
+import json, uuid
 from datetime import datetime
 
 with open('$STATE_FILE', 'r') as f:
@@ -239,6 +239,10 @@ data['updated_at'] = data['created_at']
 data['current_step'] = 1
 data['overall_status'] = 'in_progress'
 data['steps']['1']['status'] = 'pending'
+
+# Preserve existing flow_id on re-init; generate only if empty
+if not data.get('flow_id'):
+    data['flow_id'] = 'wf-' + str(uuid.uuid4())
 
 with open('$STATE_FILE', 'w') as f:
     json.dump(data, f, indent=2, ensure_ascii=False)
@@ -268,7 +272,53 @@ with open('$STATE_FILE', 'w') as f:
   echo ""
 }
 
+cmd_status_all() {
+  local registry="$HOME/.flowctl/registry.json"
+  if [[ ! -f "$registry" ]]; then
+    wf_warn "Registry chưa có (~/.flowctl/registry.json)."
+    wf_info "Mở project và chạy một lệnh flowctl để tự đăng ký."
+    exit 0
+  fi
+
+  echo -e "\n${BLUE}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${BLUE}${BOLD}   All Projects — flowctl registry${NC}"
+  echo -e "${BLUE}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  python3 - "$registry" <<'PY'
+import json, sys
+from datetime import datetime, timezone
+
+reg      = json.loads(open(sys.argv[1]).read())
+projects = sorted(reg.get("projects", {}).values(),
+                  key=lambda p: p.get("last_seen",""), reverse=True)
+now      = datetime.now(timezone.utc)
+
+if not projects:
+    print("  (no projects registered)"); sys.exit(0)
+
+for p in projects:
+    try:
+        last    = datetime.fromisoformat(p["last_seen"].replace("Z","+00:00"))
+        age_sec = int((now - last).total_seconds())
+    except Exception:
+        age_sec = 999999
+    age_str = (f"{age_sec}s" if age_sec < 60 else
+               f"{age_sec//60}m" if age_sec < 3600 else
+               f"{age_sec//3600}h") + " ago"
+    dot     = ("\033[0;32m●\033[0m" if age_sec < 600 else
+               "\033[1;33m○\033[0m" if age_sec < 3600 else
+               "\033[0;90m·\033[0m")
+    blk     = p.get("open_blockers", 0)
+    b_str   = f"  \033[0;31m⚠ {blk} blocker(s)\033[0m" if blk else ""
+    print(f"  {dot} \033[1m{p.get('project_name','?'):<28}\033[0m"
+          f"Step {p.get('current_step',0)}/9  "
+          f"{p.get('overall_status','?'):<14}{age_str}{b_str}")
+    print(f"    \033[0;90m{p.get('path','?')}\033[0m\n")
+PY
+}
+
 cmd_status() {
+  [[ "${1:-}" == "--all" ]] && { cmd_status_all; return; }
+
   [[ ! -f "$STATE_FILE" ]] && {
     wf_error "Không tìm thấy flowctl-state.json."
     wf_info "Hành động đề xuất: chạy ${WORKFLOW_CLI_CMD} init --project \"Tên dự án\""
@@ -693,7 +743,12 @@ case "$CMD" in
     cmd_mercenary "$SUBCMD" "$@"
     ;;
   monitor|mon)
-    python3 "$WORKFLOW_ROOT/scripts/monitor-web.py" "$@"
+    # Auto --global if not inside a project dir and not already specified
+    if [[ ! -f "$STATE_FILE" && "${1:-}" != "--once" && "${1:-}" != "--global" ]]; then
+      python3 "$WORKFLOW_ROOT/scripts/monitor-web.py" --global "$@"
+    else
+      python3 "$WORKFLOW_ROOT/scripts/monitor-web.py" "$@"
+    fi
     ;;
   retro)        cmd_retro "$@" ;;
   complexity)   cmd_complexity ;;

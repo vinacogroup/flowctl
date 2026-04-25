@@ -9,13 +9,24 @@ Architecture note:
   Together they give full visibility: proxy tracks savings, hook tracks leakage.
 """
 
-import json, sys, re
+import json, sys, re, os
 from pathlib import Path
 from datetime import datetime
 
-REPO    = Path(__file__).resolve().parent.parent.parent
+# Claude Code runs hooks with cwd = project root; FLOWCTL_PROJECT_ROOT overrides for manual use
+REPO    = Path(os.environ.get('FLOWCTL_PROJECT_ROOT', os.getcwd()))
 EVENTS  = REPO / ".cache" / "mcp" / "events.jsonl"
 STATS_F = REPO / ".cache" / "mcp" / "session-stats.json"
+
+def _read_project_identity() -> tuple:
+    state_f = REPO / "flowctl-state.json"
+    try:
+        s = json.loads(state_f.read_text()) if state_f.exists() else {}
+        return s.get("flow_id", ""), s.get("project_name", REPO.name)
+    except Exception:
+        return "", REPO.name
+
+_PROJECT_ID, _PROJECT_NAME = _read_project_identity()
 
 # (pattern, mcp_alternative, mcp_alt_tokens)
 # mcp_alt_tokens = expected token cost of the MCP tool output.
@@ -52,7 +63,9 @@ def ensure_cache():
 
 def log_event(event):
     ensure_cache()
-    event["ts"] = datetime.utcnow().isoformat() + "Z"
+    event["ts"]           = datetime.utcnow().isoformat() + "Z"
+    event["project_id"]   = _PROJECT_ID
+    event["project_name"] = _PROJECT_NAME
     with open(EVENTS, "a") as f:
         f.write(json.dumps(event) + "\n")
     update_stats(event)
