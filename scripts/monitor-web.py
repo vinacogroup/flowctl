@@ -3,13 +3,28 @@
 Opens browser at http://localhost:3170. Ctrl+C to stop.
 """
 
-import json, sys, signal, socket, threading, webbrowser, time, queue as _queue, os as _os
+import json, sys, signal, socket, socketserver, threading, webbrowser, time, queue as _queue, os as _os
 from pathlib import Path
 from datetime import datetime, timezone
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
 
-REPO         = Path(__file__).resolve().parent.parent
+# REPO = project root where the user ran `flowctl monitor`.
+# For global installs, __file__ is inside the npm global dir — use FLOWCTL_PROJECT_ROOT
+# (set by flowctl.sh) or cwd as the project root, not the script directory.
+_script_parent = Path(__file__).resolve().parent.parent
+_env_root      = Path(_os.environ["FLOWCTL_PROJECT_ROOT"]) if "FLOWCTL_PROJECT_ROOT" in _os.environ else None
+_cwd_root      = Path(_os.getcwd())
+
+def _detect_repo() -> Path:
+    # Priority: env var > cwd (if has state file) > script parent (local install)
+    if _env_root and (_env_root / "flowctl-state.json").exists():
+        return _env_root
+    if (_cwd_root / "flowctl-state.json").exists():
+        return _cwd_root
+    return _script_parent  # local install fallback
+
+REPO         = _detect_repo()
 CACHE        = REPO / ".cache" / "mcp"
 EVENTS_F     = CACHE / "events.jsonl"
 STATS_F      = CACHE / "session-stats.json"
@@ -670,15 +685,19 @@ function render(d) {
 }
 
 // ── Project tabs (multi-project) ─────────────────────────────
+// _activePid sentinel values:
+//   undefined  = live SSE mode (current project, auto-updates)
+//   null       = "All Projects" aggregate view (static, no SSE overwrite)
+//   'wf-...'   = specific project view (static, no SSE overwrite)
 let _projects  = {};
-let _activePid = null;  // null = show current project via SSE; string = specific project
+let _activePid = undefined;
 
 function fetchProjects() {
   fetch('/api/projects').then(r => r.json()).then(d => {
     _projects = d.projects || {};
     renderTabs();
-    // If multiple projects exist and user hasn't manually selected one, stay on SSE view
-    if (Object.keys(_projects).length > 1 && _activePid !== null) {
+    // Re-render selected view on each fetchProjects refresh (every 5s)
+    if (Object.keys(_projects).length > 1 && _activePid !== undefined) {
       renderProjectView(_activePid);
     }
   }).catch(() => {});
@@ -802,6 +821,10 @@ function connectSSE() {
   _es = new EventSource('/api/stream');
   _es.onmessage = (e) => {
     if (paused) return;
+    // Only update the view from SSE when in live mode (no tab selected).
+    // When _activePid is null (All) or a project ID, the user is in a static view —
+    // don't overwrite it with single-project SSE data.
+    if (_activePid !== undefined) return;
     try { render(JSON.parse(e.data)); setCss('ldot','opacity','1'); } catch(_) {}
   };
   _es.onerror = () => {
@@ -820,6 +843,20 @@ fetch('/api/data')
 </script>
 </body></html>
 """
+
+# -- Threaded HTTP server -------------------------------------------------------
+# HTTPServer is single-threaded by default. An SSE connection's `while True` loop
+# blocks the main thread → all subsequent requests (e.g. /api/projects) queue up
+# indefinitely (browser shows "pending"), and Ctrl+C can't interrupt serve_forever().
+#
+# ThreadingMixIn spawns a new thread per connection, so:
+#   • /api/projects responds immediately even while SSE is open
+#   • serve_forever() stays in its polling loop → shutdown flag is checked → Ctrl+C works
+#   • daemon_threads=True: SSE threads die automatically when the main thread exits
+
+class ThreadingHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
+    daemon_threads     = True   # background threads die when main thread exits
+    allow_reuse_address = True
 
 # -- HTTP handler --------------------------------------------------------------
 
@@ -873,10 +910,19 @@ class MonitorHandler(BaseHTTPRequestHandler):
             projects = discover_projects()
             result   = {}
             for pid, proj in projects.items():
+                cache_dir = proj.get("cache_dir")
+                proj_path = proj.get("path")
+                if not cache_dir or not proj_path:
+                    result[pid] = {
+                        "project_id":   pid,
+                        "project_name": proj.get("project_name", "?"),
+                        "error":        "missing cache_dir or path (registry entry stale — restart shell-proxy)",
+                    }
+                    continue
                 try:
                     result[pid] = build_project_data(
-                        proj["cache_dir"],
-                        str(Path(proj["path"]) / "flowctl-state.json")
+                        cache_dir,
+                        str(Path(proj_path) / "flowctl-state.json")
                     )
                     result[pid]["active"] = proj.get("active", False)
                 except Exception as e:
@@ -916,7 +962,7 @@ def main():
 
     port  = _find_port(port)
     url   = f"http://localhost:{port}"
-    httpd = HTTPServer(("127.0.0.1", port), MonitorHandler)
+    httpd = ThreadingHTTPServer(("127.0.0.1", port), MonitorHandler)
 
     def _stop(*_):
         print("\n[flowctl monitor] Stopping...")

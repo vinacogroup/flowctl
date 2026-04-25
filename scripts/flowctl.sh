@@ -711,8 +711,13 @@ case "$CMD" in
 esac
 
 case "$CMD" in
+  -v|--version|version)
+    VERSION=$(python3 -c "import json; print(json.load(open('$WORKFLOW_ROOT/package.json'))['version'])" 2>/dev/null || echo "unknown")
+    echo "flowctl $VERSION"
+    exit 0
+    ;;
   init)         cmd_init "$@" ;;
-  status|s)     cmd_status ;;
+  status|s)     cmd_status "$@" ;;
   start)        cmd_start ;;
   gate-check|gate) cmd_gate_check ;;
   approve|a)    cmd_approve "$@" ;;
@@ -743,11 +748,12 @@ case "$CMD" in
     cmd_mercenary "$SUBCMD" "$@"
     ;;
   monitor|mon)
+    # Pass project root so monitor-web.py resolves REPO correctly for global installs
     # Auto --global if not inside a project dir and not already specified
     if [[ ! -f "$STATE_FILE" && "${1:-}" != "--once" && "${1:-}" != "--global" ]]; then
-      python3 "$WORKFLOW_ROOT/scripts/monitor-web.py" --global "$@"
+      FLOWCTL_PROJECT_ROOT="$PROJECT_ROOT" python3 "$WORKFLOW_ROOT/scripts/monitor-web.py" --global "$@"
     else
-      python3 "$WORKFLOW_ROOT/scripts/monitor-web.py" "$@"
+      FLOWCTL_PROJECT_ROOT="$PROJECT_ROOT" python3 "$WORKFLOW_ROOT/scripts/monitor-web.py" "$@"
     fi
     ;;
   retro)        cmd_retro "$@" ;;
@@ -763,8 +769,9 @@ case "$CMD" in
   help|--help|-h)
     echo ""
     wf_info "IT Product Workflow CLI"
+    echo -e "  -v, --version          Xem version hiện tại"
     echo -e "  init --project \"Name\" [--no-setup]  Khởi tạo dự án (+ setup mặc định)"
-    echo -e "  status                 Xem trạng thái"
+    echo -e "  status [--all]         Xem trạng thái (--all: tất cả projects trong registry)"
     echo -e "  start                  Bắt đầu step hiện tại"
     echo -e "  monitor [--once] [--port=N] [--interval=N]"
     echo -e "                         Mở web dashboard tại localhost"
