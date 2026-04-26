@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   publish:
@@ -17,10 +16,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          registry-url: https://npm.pkg.github.com
+          registry-url: https://registry.npmjs.org
       - run: npm ci
-      # Use the job token (not a repo secret named GITHUB_*). With packages:write
-      # this can publish to npm.pkg.github.com for this repository's packages.
       - run: npm publish --ignore-scripts
         env:
-          VINACO_GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
