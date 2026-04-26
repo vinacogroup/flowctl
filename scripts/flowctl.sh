@@ -88,6 +88,27 @@ export FLOWCTL_HOME FLOWCTL_DATA_DIR FLOWCTL_CACHE_DIR FLOWCTL_RUNTIME_DIR \
 
 # ── Commands ─────────────────────────────────────────────────
 
+# Copy files from $1 into $2, skipping files that already exist (unless overwrite=true).
+# Uses find+cp for portability on Windows Git Bash (no rsync needed).
+_scaffold_dir() {
+  local src="$1" dst="$2" overwrite="${3:-false}"
+  [[ -d "$src" ]] || return 0
+  mkdir -p "$dst"
+  if [[ "$overwrite" == "true" ]]; then
+    cp -r "$src/." "$dst/"
+    return 0
+  fi
+  # Merge: only copy files not present in dst
+  while IFS= read -r -d '' f; do
+    local rel="${f#$src/}"
+    local target="$dst/$rel"
+    if [[ ! -e "$target" ]]; then
+      mkdir -p "$(dirname "$target")"
+      cp "$f" "$target"
+    fi
+  done < <(find "$src" -type f -print0)
+}
+
 ensure_project_scaffold() {
   local overwrite_existing="${1:-false}"
   local template_state="$WORKFLOW_ROOT/templates/flowctl-state.template.json"
@@ -177,11 +198,49 @@ ensure_project_scaffold() {
     cp "$role_template" "$PROJECT_ROOT/workflows/policies/role-policy.v1.json"
   fi
 
+  # .cursor subdirs: agents, commands, rules, skills
+  local cursor_dirs=("agents" "commands" "rules" "skills")
+  local cursor_statuses=()
+  for _dir in "${cursor_dirs[@]}"; do
+    local _src="$WORKFLOW_ROOT/.cursor/$_dir"
+    local _dst="$PROJECT_ROOT/.cursor/$_dir"
+    if [[ -d "$_src" ]]; then
+      local _existed="false"
+      [[ -d "$_dst" ]] && _existed="true"
+      _scaffold_dir "$_src" "$_dst" "$overwrite_existing"
+      if [[ "$_existed" == "false" ]]; then
+        cursor_statuses+=("$_dir:created")
+      elif [[ "$overwrite_existing" == "true" ]]; then
+        cursor_statuses+=("$_dir:overwritten")
+      else
+        cursor_statuses+=("$_dir:merged")
+      fi
+    fi
+  done
+
+  # .cursorrules
+  local cursorrules_status="skipped"
+  local _cr_src="$WORKFLOW_ROOT/.cursorrules"
+  local _cr_dst="$PROJECT_ROOT/.cursorrules"
+  if [[ -f "$_cr_src" ]]; then
+    if [[ ! -f "$_cr_dst" || "$overwrite_existing" == "true" ]]; then
+      cp "$_cr_src" "$_cr_dst"
+      cursorrules_status="$([[ -f "$_cr_dst" && "$overwrite_existing" == "true" ]] && echo "overwritten" || echo "created")"
+    else
+      cursorrules_status="unchanged"
+    fi
+  fi
+
   wf_info "Scaffold status:"
   [[ "$state_status" == "created" || "$state_status" == "overwritten" ]] && \
     wf_success "flowctl-state.json: $state_status" || wf_warn "flowctl-state.json: $state_status"
   [[ "$mcp_status" == "created" || "$mcp_status" == "overwritten" || "$mcp_status" == "merged" || "$mcp_status" == "unchanged" || "$mcp_status" == "skipped_permission_denied" ]] && \
     wf_success ".cursor/mcp.json: $mcp_status" || wf_warn ".cursor/mcp.json: $mcp_status"
+  for _s in "${cursor_statuses[@]}"; do
+    wf_success ".cursor/${_s/:*}: ${_s/*:}"
+  done
+  [[ "$cursorrules_status" == "created" || "$cursorrules_status" == "overwritten" || "$cursorrules_status" == "unchanged" ]] && \
+    wf_success ".cursorrules: $cursorrules_status" || wf_warn ".cursorrules: $cursorrules_status"
   [[ "$settings_status" == "created" || "$settings_status" == "overwritten" ]] && \
     wf_success ".claude/settings.json: $settings_status" || wf_warn ".claude/settings.json: $settings_status"
 }

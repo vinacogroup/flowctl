@@ -43,7 +43,12 @@
     "templates",
     "workflows/dispatch",
     "workflows/gates",
-    "workflows/policies"
+    "workflows/policies",
+    ".cursor/agents",
+    ".cursor/commands",
+    ".cursor/rules",
+    ".cursor/skills",
+    ".cursorrules"
   ],
   "devDependencies": {
     "husky": "^9.1.7"
