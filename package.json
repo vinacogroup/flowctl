@@ -6,11 +6,11 @@
   "private": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vinacogr/flowctl.git"
+    "url": "git+https://github.com/vinacogroup/flowctl.git"
   },
   "author": "Vinaco Group",
   "license": "MIT",
-  "homepage": "https://github.com/vinacogr/flowctl",
+  "homepage": "https://github.com/vinacogroup/flowctl",
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
     "access": "public"
