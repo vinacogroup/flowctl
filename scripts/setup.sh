@@ -87,7 +87,7 @@ install_mcp_deps() {
   fi
 
   # Chỉ cần chạy khi dùng từ source repo (không phải global install).
-  # Khi install qua `npm install -g @vinacogroup/flowctl`, npm đã cài
+  # Khi install qua `npm install -g @vinacogr/flowctl`, npm đã cài
   # @modelcontextprotocol/sdk tự động — không cần bước này.
   # Resolve flowctl package dir từ vị trí script này (scripts/setup.sh → parent = package root)
   local flowctl_pkg_dir

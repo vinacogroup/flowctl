@@ -1,16 +1,16 @@
 {
-  "name": "@vinacogroup/flowctl",
+  "name": "@vinacogr/flowctl",
   "version": "0.0.1",
   "type": "module",
   "description": "Workflow Orchestration for Cursor",
   "private": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vinacogroup/flowctl.git"
+    "url": "git+https://github.com/vinacogr/flowctl.git"
   },
   "author": "Vinaco Group",
   "license": "MIT",
-  "homepage": "https://github.com/vinacogroup/flowctl",
+  "homepage": "https://github.com/vinacogr/flowctl",
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
     "access": "public"
@@ -82,6 +82,6 @@
     "test": "test"
   },
   "bugs": {
-    "url": "https://github.com/vinacogroup/flowctl/issues"
+    "url": "https://github.com/vinacogr/flowctl/issues"
   }
 }
