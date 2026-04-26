@@ -1,6 +1,6 @@
 {
   "name": "@vinacogr/flowctl",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "type": "module",
   "description": "Workflow Orchestration for Cursor",
   "private": false,
