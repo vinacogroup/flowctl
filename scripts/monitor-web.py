@@ -74,38 +74,74 @@ def _enrich_from_meta(proj: dict) -> dict:
     return proj
 
 def discover_projects() -> dict:
-    """All projects in registry + always include current REPO if it has a state file."""
-    reg    = load_registry()
+    """Discover all projects from ~/.flowctl/projects/*/meta.json + REPO fallback.
+
+    Primary source: meta.json files written by `flowctl init` (v1.1+ layout).
+    Secondary source: legacy registry.json (pre-v1.1 backward compat).
+    Fallback: current REPO's flowctl-state.json (local install / in-project run).
+    """
     now_ts = datetime.now(timezone.utc).timestamp()
-    result = {}
+    result: dict = {}
 
-    for pid, proj in reg.get("projects", {}).items():
-        try:
-            last_ts = datetime.fromisoformat(proj["last_seen"].replace("Z","+00:00")).timestamp()
-        except Exception:
-            last_ts = 0
-        proj = dict(proj)
-        proj["active"] = (now_ts - last_ts) < 600
-        proj = _enrich_from_meta(proj)   # fill cache_dir from meta.json if missing
-        result[pid] = proj
+    # --- Primary: scan ~/.flowctl/projects/*/meta.json ---
+    projects_dir = FLOWCTL_HOME / "projects"
+    if projects_dir.exists():
+        for entry in projects_dir.iterdir():
+            if not entry.is_dir():
+                continue
+            meta_f = entry / "meta.json"
+            if not meta_f.exists():
+                continue
+            try:
+                meta      = json.loads(meta_f.read_text())
+                pid       = meta.get("project_id")
+                if not pid:
+                    continue
+                cache_dir = meta.get("cache_dir", str(entry / "cache"))
+                ef        = Path(cache_dir) / "events.jsonl"
+                last_ts   = ef.stat().st_mtime if ef.exists() else 0
+                result[pid] = {
+                    "project_id":   pid,
+                    "project_name": meta.get("project_name", entry.name),
+                    "path":         meta.get("path", ""),
+                    "cache_dir":    cache_dir,
+                    "runtime_dir":  meta.get("runtime_dir", str(entry / "runtime")),
+                    "active":       (now_ts - last_ts) < 600,
+                    "last_seen":    datetime.fromtimestamp(last_ts, tz=timezone.utc).isoformat() if last_ts else "",
+                }
+            except Exception:
+                pass
 
-    # Always include current directory (even if not yet in registry)
+    # --- Secondary: legacy registry.json (backward compat) ---
+    for pid, proj in load_registry().get("projects", {}).items():
+        if pid not in result:
+            try:
+                last_ts = datetime.fromisoformat(proj["last_seen"].replace("Z", "+00:00")).timestamp()
+            except Exception:
+                last_ts = 0
+            proj = dict(proj)
+            proj["active"] = (now_ts - last_ts) < 600
+            proj = _enrich_from_meta(proj)
+            result[pid] = proj
+
+    # --- Fallback: current REPO (in-project run or local install) ---
     local_state = REPO / "flowctl-state.json"
-    if not any(p.get("path") == str(REPO) for p in result.values()) and local_state.exists():
+    if local_state.exists() and not any(p.get("path") == str(REPO) for p in result.values()):
         try:
             s   = json.loads(local_state.read_text())
             pid = s.get("flow_id", "_local")
-            result[pid] = {
-                "project_id":   pid,
-                "project_name": s.get("project_name", REPO.name),
-                "path":         str(REPO),
-                # Use env-var cache dir (set by flowctl.sh) or fallback to legacy path
-                "cache_dir":    _os.environ.get("FLOWCTL_CACHE_DIR", str(CACHE)),
-                "active":       True,
-                "last_seen":    datetime.now(timezone.utc).isoformat(),
-            }
+            if pid not in result:
+                result[pid] = {
+                    "project_id":   pid,
+                    "project_name": s.get("project_name", REPO.name),
+                    "path":         str(REPO),
+                    "cache_dir":    _os.environ.get("FLOWCTL_CACHE_DIR", str(CACHE)),
+                    "active":       True,
+                    "last_seen":    datetime.now(timezone.utc).isoformat(),
+                }
         except Exception:
             pass
+
     return result
 
 # -- SSE broadcaster (push to all connected browser clients) -------------------
@@ -1095,11 +1131,22 @@ function connectSSE() {
   _es.onopen = () => { setCss('ldot','opacity','1'); };
 }
 
-// Fetch initial data, set _curPid, then connect SSE
+// Fetch initial data, set _curPid, then connect SSE.
+// If no current project (running from outside a project dir), default to All Projects view.
 fetch('/api/data')
   .then(r => r.json())
-  .then(d => { _curPid = d.project_id || ''; render(d); connectSSE(); })
-  .catch(() => connectSSE());
+  .then(d => {
+    _curPid = d.project_id || '';
+    if (!_curPid) {
+      // Global mode: no local project — show All Projects view
+      _activePid = null;
+      fetchProjects();
+    } else {
+      render(d);
+    }
+    connectSSE();
+  })
+  .catch(() => { connectSSE(); fetchProjects(); });
 </script>
 </body></html>
 """
