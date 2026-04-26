@@ -47,8 +47,7 @@ wf_budget_prelaunch_check() {
   WF_STATE_FILE="$STATE_FILE" \
   WF_STEP="$step" WF_ROLE="$role" WF_FLOW_ID="$flow_id" WF_WORKFLOW_ID="$flow_id" WF_RUN_ID="$run_id" \
   WF_MAX_RETRIES="$max_retries" WF_BUDGET_DRY_RUN="$dry_run" WF_OVERRIDE_REASON="$override_reason" WF_CORRELATION_ID="$correlation_id" python3 - <<'PY'
-import json
-import os
+import json, os, fcntl, time, random
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -67,6 +66,32 @@ state_path = Path(os.environ["WF_BUDGET_STATE_FILE"])
 events_path = Path(os.environ["WF_BUDGET_EVENTS_FILE"])
 policy_path = Path(os.environ["WF_BUDGET_POLICY_FILE"])
 flow_state_path = Path(os.environ["WF_STATE_FILE"])
+
+# Acquire exclusive lock on budget state before any read-check-write to prevent
+# concurrent headless workers from bypassing the token cap.
+_lock_path = str(state_path) + ".lock"
+_lock_fd = open(_lock_path, "w")
+_deadline = time.monotonic() + 15
+while True:
+    try:
+        fcntl.flock(_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        break
+    except BlockingIOError:
+        if time.monotonic() > _deadline:
+            import sys
+            print("[budget] lock timeout; proceeding without exclusive lock", file=sys.stderr)
+            break
+        time.sleep(0.05 + random.uniform(0, 0.05))
+
+def _unlock_and_exit(code=0):
+    """Release budget lock and exit. Use instead of raise SystemExit() after lock acquisition."""
+    try:
+        fcntl.flock(_lock_fd, fcntl.LOCK_UN)
+    except Exception:
+        pass
+    _lock_fd.close()
+    raise SystemExit(code)
+
 step = int(os.environ["WF_STEP"])
 role = os.environ["WF_ROLE"]
 flow_id = os.environ["WF_FLOW_ID"]
@@ -80,13 +105,13 @@ now_dt = parse_iso(now)
 
 if not policy_path.exists():
     print("ALLOW|budget policy missing; guard disabled")
-    raise SystemExit(0)
+    _unlock_and_exit(0)
 
 state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
 policy = json.loads(policy_path.read_text(encoding="utf-8"))
 if not policy.get("enabled", True):
     print("ALLOW|budget policy disabled")
-    raise SystemExit(0)
+    _unlock_and_exit(0)
 
 defaults = policy.get("defaults", {})
 run_caps = defaults.get("run_caps", {})
@@ -183,7 +208,7 @@ if breaker["state"] == "open":
         })
     elif override_reason and override_used:
         print("BLOCK|budget_override_already_used")
-        raise SystemExit(0)
+        _unlock_and_exit(0)
     elif not override_reason:
         if not dry_run:
             state_path.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -192,7 +217,7 @@ if breaker["state"] == "open":
                     for ev in events:
                         f.write(json.dumps(ev, ensure_ascii=False) + "\n")
         print("BLOCK|breaker=open")
-        raise SystemExit(0)
+        _unlock_and_exit(0)
 if breaker["state"] == "open":
     if not dry_run:
         state_path.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -201,13 +226,13 @@ if breaker["state"] == "open":
                 for ev in events:
                     f.write(json.dumps(ev, ensure_ascii=False) + "\n")
     print("BLOCK|breaker=open")
-    raise SystemExit(0)
+    _unlock_and_exit(0)
 
 if breaker["state"] == "half-open":
     probe_role = (breaker.get("probe_role") or "").strip()
     if probe_role and probe_role != role:
         print(f"BLOCK|breaker=half-open probe_role={probe_role}")
-        raise SystemExit(0)
+        _unlock_and_exit(0)
     if not probe_role:
         breaker["probe_role"] = role
         breaker["last_transition_at"] = now
@@ -275,14 +300,23 @@ if breaches and override_reason and not override_used:
 
 if breaches and override_reason and override_used:
     print("BLOCK|budget_override_already_used")
-    raise SystemExit(0)
+    _unlock_and_exit(0)
 
 if breaches:
+    # Exponential backoff on cooldown: each re-open from half-open increases
+    # cooldown by 1.5x, capped at 1800s. Prevents thrashing between half-open/open.
+    prev_cooldown = int(breaker.get("cooldown_seconds", cooldown_seconds))
+    was_half_open = (breaker.get("state") == "half-open")
+    if was_half_open:
+        new_cooldown = min(int(prev_cooldown * 1.5), 1800)
+    else:
+        new_cooldown = cooldown_seconds
     breaker["state"] = "open"
     breaker["opened_at"] = now
     breaker["last_transition_at"] = now
     breaker["reason"] = ",".join(breaches)
     breaker["probe_role"] = ""
+    breaker["cooldown_seconds"] = new_cooldown
     events.append({
         "timestamp": now,
         "type": "breaker_opened",
@@ -291,6 +325,7 @@ if breaches:
         "step": step,
         "role": role,
         "breaches": breaches,
+        "cooldown_seconds": new_cooldown,
         "correlation_id": correlation_id,
     })
     if not dry_run:
@@ -313,7 +348,7 @@ if breaches:
             for ev in events:
                 f.write(json.dumps(ev, ensure_ascii=False) + "\n")
     print(f"BLOCK|cap_breached={','.join(breaches)}")
-    raise SystemExit(0)
+    _unlock_and_exit(0)
 
 if dry_run:
     print(
@@ -322,7 +357,7 @@ if dry_run:
         f" cost={round(projected_cost, 4)}/{float(run_caps.get('max_cost_usd', 5.0))}"
         " dry_run=true"
     )
-    raise SystemExit(0)
+    _unlock_and_exit(0)
 
 run["consumed_tokens_est"] = projected_tokens
 run["consumed_runtime_seconds"] = projected_runtime
@@ -367,11 +402,20 @@ if events:
         for ev in events:
             f.write(json.dumps(ev, ensure_ascii=False) + "\n")
 
-print(
+result = (
     f"ALLOW|tokens={projected_tokens}/{int(run_caps.get('max_tokens_total', 100000))}"
     f" runtime={projected_runtime}/{int(run_caps.get('max_runtime_seconds', 3600))}"
     f" cost={round(projected_cost, 4)}/{float(run_caps.get('max_cost_usd', 5.0))}"
 )
+
+# Release budget lock before printing result
+try:
+    fcntl.flock(_lock_fd, fcntl.LOCK_UN)
+except Exception:
+    pass
+_lock_fd.close()
+
+print(result)
 PY
 }
 

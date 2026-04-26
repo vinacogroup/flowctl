@@ -13,13 +13,37 @@ from urllib.parse import urlparse
 # For global installs, __file__ is inside the npm global dir — use FLOWCTL_PROJECT_ROOT
 # (set by flowctl.sh) or cwd as the project root, not the script directory.
 _script_parent = Path(__file__).resolve().parent.parent
-_env_root      = Path(_os.environ["FLOWCTL_PROJECT_ROOT"]) if "FLOWCTL_PROJECT_ROOT" in _os.environ else None
 _cwd_root      = Path(_os.getcwd())
+
+# Windows/Git Bash: env vars may contain MSYS paths (/c/Users/...) that are not
+# valid Windows paths for pathlib. Normalize via resolve() after constructing.
+def _normalize_path(p: Path) -> Path:
+    """Resolve MSYS/mixed-case paths to a canonical OS path."""
+    try:
+        return p.resolve()
+    except Exception:
+        return p
+
+_env_root = _normalize_path(Path(_os.environ["FLOWCTL_PROJECT_ROOT"])) \
+    if "FLOWCTL_PROJECT_ROOT" in _os.environ else None
 
 def _detect_repo() -> Path:
     # Priority: env var > cwd (if has state file) > script parent (local install)
-    if _env_root and (_env_root / "flowctl-state.json").exists():
-        return _env_root
+    if _env_root is not None:
+        if not _env_root.exists():
+            import sys
+            print(f"[monitor-web] WARNING: FLOWCTL_PROJECT_ROOT={_env_root!r} does not exist; "
+                  f"falling back to cwd={_cwd_root!r}", file=sys.stderr)
+        elif not _os.access(_env_root, _os.R_OK):
+            import sys
+            print(f"[monitor-web] WARNING: FLOWCTL_PROJECT_ROOT={_env_root!r} is not readable; "
+                  f"falling back to cwd={_cwd_root!r}", file=sys.stderr)
+        elif (_env_root / "flowctl-state.json").exists():
+            return _env_root
+        else:
+            import sys
+            print(f"[monitor-web] WARNING: FLOWCTL_PROJECT_ROOT={_env_root!r} has no "
+                  f"flowctl-state.json; falling back to cwd={_cwd_root!r}", file=sys.stderr)
     if (_cwd_root / "flowctl-state.json").exists():
         return _cwd_root
     return _script_parent  # local install fallback
@@ -30,9 +54,9 @@ STATE_F      = REPO / "flowctl-state.json"
 # Prefer FLOWCTL_CACHE_DIR / _EVENTS_F / _STATS_F set by flowctl.sh (v1.1+ home dir layout).
 # Fallback: legacy .cache/mcp/ inside the project root (pre-v1.1 or no env vars).
 _legacy_cache = REPO / ".cache" / "mcp"
-CACHE    = Path(_os.environ.get("FLOWCTL_CACHE_DIR", str(_legacy_cache)))
-EVENTS_F = Path(_os.environ.get("FLOWCTL_EVENTS_F",  str(CACHE / "events.jsonl")))
-STATS_F  = Path(_os.environ.get("FLOWCTL_STATS_F",   str(CACHE / "session-stats.json")))
+CACHE    = _normalize_path(Path(_os.environ.get("FLOWCTL_CACHE_DIR", str(_legacy_cache))))
+EVENTS_F = _normalize_path(Path(_os.environ.get("FLOWCTL_EVENTS_F",  str(CACHE / "events.jsonl"))))
+STATS_F  = _normalize_path(Path(_os.environ.get("FLOWCTL_STATS_F",   str(CACHE / "session-stats.json"))))
 
 THRESHOLDS   = {"bash_waste_per_event": 400, "cache_hit_rate_min": 0.65}
 STEP_BUDGETS  = {1:8000,2:12000,3:10000,4:18000,5:18000,6:14000,7:12000,8:10000,9:8000}
@@ -84,6 +108,9 @@ def discover_projects() -> dict:
     result: dict = {}
 
     # --- Primary: scan ~/.flowctl/projects/*/meta.json ---
+    # L-08: project membership is determined solely by meta.json presence.
+    # events.jsonl is only consulted for the last-seen timestamp; a missing file
+    # yields last_ts=0 (project never active) but the project is still included.
     projects_dir = FLOWCTL_HOME / "projects"
     if projects_dir.exists():
         for entry in projects_dir.iterdir():
@@ -99,7 +126,7 @@ def discover_projects() -> dict:
                     continue
                 cache_dir = meta.get("cache_dir", str(entry / "cache"))
                 ef        = Path(cache_dir) / "events.jsonl"
-                last_ts   = ef.stat().st_mtime if ef.exists() else 0
+                last_ts   = ef.stat().st_mtime if ef.exists() else 0  # missing = never active
                 result[pid] = {
                     "project_id":   pid,
                     "project_name": meta.get("project_name", entry.name),
@@ -168,8 +195,16 @@ class SSEBroadcaster:
         with self._lock:
             clients = list(self._clients)
         for q in clients:
-            try:    q.put_nowait(msg)
-            except: dead.append(q)
+            try:
+                q.put_nowait(msg)
+            except _queue.Full:
+                # Client queue is full — consider it dead (too slow to consume)
+                dead.append(q)
+            except Exception as e:
+                # Unexpected error: log to stderr so it's visible, still remove client
+                import sys
+                print(f"[monitor-web] broadcast error for client {q}: {e}", file=sys.stderr)
+                dead.append(q)
         for q in dead:
             self.unsubscribe(q)
 
@@ -1349,6 +1384,9 @@ def main():
         watch_map[str(p)] = None
 
     # Other projects from ~/.flowctl/projects/
+    # L-08: scan meta.json to build the project list; do NOT gate on events.jsonl
+    # existence — new/idle projects that haven't written any events yet must still
+    # be registered so the FileWatcher picks them up the moment they become active.
     if (FLOWCTL_HOME / "projects").exists():
         for entry in (FLOWCTL_HOME / "projects").iterdir():
             meta_f = entry / "meta.json"
@@ -1362,8 +1400,9 @@ def main():
                 cdir  = meta.get("cache_dir", str(entry / "cache"))
                 spath = str(Path(meta.get("path", "")) / "flowctl-state.json")
                 ef    = Path(cdir) / "events.jsonl"
-                if ef.exists():
-                    watch_map[str(ef)] = {"project_id": pid, "cache_dir": cdir, "state_path": spath}
+                # Register eagerly — FileWatcher tolerates non-existent paths and
+                # will begin tracking as soon as the file is created.
+                watch_map[str(ef)] = {"project_id": pid, "cache_dir": cdir, "state_path": spath}
             except Exception:
                 pass
 

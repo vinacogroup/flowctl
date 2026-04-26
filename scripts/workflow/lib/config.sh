@@ -97,12 +97,22 @@ BUDGET_POLICY_FILE="$REPO_ROOT/workflows/policies/budget-policy.v1.json"
 
 # Ensure data dirs exist (idempotent, no-op if already created)
 flowctl_ensure_data_dirs() {
+  # Validate FLOWCTL_HOME is writable before attempting to create sub-dirs.
+  # Silently degraded writes (e.g. root-owned ~/.flowctl) are worse than a clear error.
+  if [[ -e "$FLOWCTL_HOME" && ! -w "$FLOWCTL_HOME" ]]; then
+    echo -e "${RED}[flowctl] ERROR: FLOWCTL_HOME ($FLOWCTL_HOME) exists but is not writable.${NC}" >&2
+    echo -e "${YELLOW}[flowctl] Fix: sudo chown \$USER \"$FLOWCTL_HOME\" or set FLOWCTL_HOME to a writable path.${NC}" >&2
+    return 1
+  fi
   mkdir -p \
     "$FLOWCTL_CACHE_DIR" \
     "$FLOWCTL_RUNTIME_DIR/evidence" \
     "$FLOWCTL_RUNTIME_DIR/release-dashboard" \
     "$FLOWCTL_HOME/projects" \
-    2>/dev/null || true
+    2>/dev/null || {
+    echo -e "${RED}[flowctl] ERROR: Failed to create data dirs under $FLOWCTL_HOME. Check permissions.${NC}" >&2
+    return 1
+  }
 }
 
 # Module directory for dynamic source in entrypoint.

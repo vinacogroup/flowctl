@@ -1,4 +1,16 @@
 #!/usr/bin/env bash
+# dispatch.sh — Dispatch workers for the current workflow step.
+#
+# EXIT CODES (contract — callers must handle all three):
+#   0   — Success (briefs generated, workers launched/printed)
+#   1   — Logical error (state missing, JSON corrupt, file I/O failure, empty roles)
+#   2   — Policy violation (mode not allowed, --trust denied by policy)
+#   255 — Fatal / unexpected error (unhandled exception)
+#
+# Output format for policy violations:
+#   POLICY_VIOLATION|<reason1> ; <reason2>  → exit 2
+# Output format for brief generation errors:
+#   ERROR|brief_generation|<detail>         → exit 1
 
 cmd_dispatch() {
   local auto_launch="false"
@@ -57,6 +69,10 @@ if not wid:
 print(wid)
 PY
 ) || { echo -e "${RED}Lỗi: không đọc được flow_id từ state (timeout 30s). Kiểm tra flowctl-state.json.${NC}" >&2; exit 1; }
+  if [[ -z "$flow_id" ]]; then
+    echo -e "${YELLOW}[dispatch] flow_id rỗng sau khi đọc state — dùng fallback UUID.${NC}" >&2
+    flow_id="fallback-$(python3 -c 'import uuid; print(uuid.uuid4())')"
+  fi
   local run_id
   run_id="run-$(date -u '+%Y%m%dT%H%M%SZ')-$RANDOM"
   local dispatch_mode="manual"
@@ -89,64 +105,69 @@ policy_path = Path(os.environ["WF_POLICY_FILE"])
 trust_requested = os.environ.get("WF_TRUST_REQUESTED", "false").lower() == "true"
 dispatch_mode = os.environ.get("WF_DISPATCH_MODE", "manual")
 
-data = json.loads(state_path.read_text(encoding="utf-8"))
-s = data["steps"][step]
+try:
+    data = json.loads(state_path.read_text(encoding="utf-8"))
+    s = data["steps"][step]
 
-primary = s.get("agent", "").strip()
-supports = [a.strip() for a in s.get("support_agents", []) if a and a.strip()]
-roles = []
-for role in [primary] + supports:
-    if role and role not in roles:
-        roles.append(role)
+    primary = s.get("agent", "").strip()
+    supports = [a.strip() for a in s.get("support_agents", []) if a and a.strip()]
+    roles = []
+    for role in [primary] + supports:
+        if role and role not in roles:
+            roles.append(role)
 
-policy = {"defaults": {"allow_trust": False, "allowed_modes": ["manual", "headless", "launch"]}, "roles": {}}
-if policy_path.exists():
-    policy = json.loads(policy_path.read_text(encoding="utf-8"))
-defaults = policy.get("defaults", {})
-role_overrides = policy.get("roles", {})
+    if not roles:
+        print("ERROR|brief_generation|step has no agents assigned — kiểm tra flowctl-state.json", file=sys.stderr)
+        raise SystemExit(1)
 
-def role_allow_trust(role: str) -> bool:
-    role_cfg = role_overrides.get(role, {})
-    return bool(role_cfg.get("allow_trust", defaults.get("allow_trust", False)))
+    policy = {"defaults": {"allow_trust": False, "allowed_modes": ["manual", "headless", "launch"]}, "roles": {}}
+    if policy_path.exists():
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+    defaults = policy.get("defaults", {})
+    role_overrides = policy.get("roles", {})
 
-def role_allowed_modes(role: str):
-    role_cfg = role_overrides.get(role, {})
-    modes = role_cfg.get("allowed_modes", defaults.get("allowed_modes", ["manual", "headless", "launch"]))
-    return [str(m).strip() for m in modes if str(m).strip()]
+    def role_allow_trust(role: str) -> bool:
+        role_cfg = role_overrides.get(role, {})
+        return bool(role_cfg.get("allow_trust", defaults.get("allow_trust", False)))
 
-violations = []
-for role in roles:
-    modes = role_allowed_modes(role)
-    if dispatch_mode not in modes:
-        violations.append(f"@{role}: mode '{dispatch_mode}' not allowed (allowed={modes})")
-    if trust_requested and not role_allow_trust(role):
-        violations.append(f"@{role}: --trust is denied by policy")
+    def role_allowed_modes(role: str):
+        role_cfg = role_overrides.get(role, {})
+        modes = role_cfg.get("allowed_modes", defaults.get("allowed_modes", ["manual", "headless", "launch"]))
+        return [str(m).strip() for m in modes if str(m).strip()]
 
-if violations:
-    print("POLICY_VIOLATION|" + " ; ".join(violations))
-    raise SystemExit(2)
+    violations = []
+    for role in roles:
+        modes = role_allowed_modes(role)
+        if dispatch_mode not in modes:
+            violations.append(f"@{role}: mode '{dispatch_mode}' not allowed (allowed={modes})")
+        if trust_requested and not role_allow_trust(role):
+            violations.append(f"@{role}: --trust is denied by policy")
 
-step_name = s.get("name", "")
-kickoff_candidates = sorted((repo_root / "workflows" / "steps").glob(f"{int(step):02d}-*.md"))
-kickoff_rel = str(kickoff_candidates[0].relative_to(repo_root)) if kickoff_candidates else ""
+    if violations:
+        print("POLICY_VIOLATION|" + " ; ".join(violations))
+        raise SystemExit(2)
 
-plan_candidates = sorted((repo_root / "plans").glob("*/plan.md"))
-latest_plan = str(plan_candidates[-1].relative_to(repo_root)) if plan_candidates else ""
+    step_name = s.get("name", "")
+    kickoff_candidates = sorted((repo_root / "workflows" / "steps").glob(f"{int(step):02d}-*.md"))
+    kickoff_rel = str(kickoff_candidates[0].relative_to(repo_root)) if kickoff_candidates else ""
 
-digest_path = dispatch_dir / "context-digest.md"
-digest_rel = str(digest_path.relative_to(repo_root)) if digest_path.exists() else ""
+    plan_candidates = sorted((repo_root / "plans").glob("*/plan.md"))
+    latest_plan = str(plan_candidates[-1].relative_to(repo_root)) if plan_candidates else ""
 
-# Code steps need GitNexus architecture query
-code_steps = {"4", "5", "6", "7", "8"}
-is_code_step = step in code_steps
+    digest_path = dispatch_dir / "context-digest.md"
+    digest_rel = str(digest_path.relative_to(repo_root)) if digest_path.exists() else ""
 
-for role in roles:
-    brief_path = dispatch_dir / f"{role}-brief.md"
-    report_path = reports_dir / f"{role}-report.md"
-    merc_dir = dispatch_dir / "mercenaries"
-    merc_outputs = sorted(merc_dir.glob("*-output.md")) if merc_dir.exists() else []
+    # Code steps need GitNexus architecture query
+    code_steps = {"4", "5", "6", "7", "8"}
+    is_code_step = step in code_steps
 
-    brief = f"""# Worker Brief — @{role} — Step {step}: {step_name}
+    for role in roles:
+        brief_path = dispatch_dir / f"{role}-brief.md"
+        report_path = reports_dir / f"{role}-report.md"
+        merc_dir = dispatch_dir / "mercenaries"
+        merc_outputs = sorted(merc_dir.glob("*-output.md")) if merc_dir.exists() else []
+
+        brief = f"""# Worker Brief — @{role} — Step {step}: {step_name}
 
 ## 🔍 Context Loading — MANDATORY (thực hiện theo thứ tự, dừng khi đủ thông tin)
 
@@ -158,16 +179,16 @@ wf_state()           ← nếu chỉ cần step/status hiện tại
 
 ### Layer 2 — GitNexus (chỉ dùng cho code tasks — steps 4-8)
 """
-    if is_code_step:
-        brief += f"""```
+        if is_code_step:
+            brief += f"""```
 gitnexus_get_architecture()
 gitnexus_find_related("{role}")
 ```
 """
-    else:
-        brief += "*(Skip — non-code step)*\n"
+        else:
+            brief += "*(Skip — non-code step)*\n"
 
-    brief += f"""
+        brief += f"""
 ### Layer 3 — Code graph (steps 4-8 only, code structure questions)
 ```
 query_graph("tên component/flow cần hiểu")   ← chỉ cho code structure
@@ -175,18 +196,18 @@ query_graph("tên component/flow cần hiểu")   ← chỉ cho code structure
 
 ### Layer 4 — File reads (fallback, chỉ khi Layer 1-3 không đủ)
 """
-    if digest_rel:
-        brief += f"- @{digest_rel} ← context digest (War Room output + prior decisions)\n"
-    if kickoff_rel:
-        brief += f"- @{kickoff_rel}\n"
-    if latest_plan:
-        brief += f"- @{latest_plan}\n"
-    if mout := [str(f.relative_to(repo_root)) for f in merc_outputs]:
-        brief += "\n### Mercenary Outputs (pre-researched, read these first)\n"
-        for mo in mout:
-            brief += f"- @{mo}\n"
+        if digest_rel:
+            brief += f"- @{digest_rel} ← context digest (War Room output + prior decisions)\n"
+        if kickoff_rel:
+            brief += f"- @{kickoff_rel}\n"
+        if latest_plan:
+            brief += f"- @{latest_plan}\n"
+        if mout := [str(f.relative_to(repo_root)) for f in merc_outputs]:
+            brief += "\n### Mercenary Outputs (pre-researched, read these first)\n"
+            for mo in mout:
+                brief += f"- @{mo}\n"
 
-    brief += f"""
+        brief += f"""
 ---
 
 ## 📋 Nhiệm vụ của @{role}
@@ -236,9 +257,22 @@ Ghi vào đường dẫn tuyệt đối này (tạo thư mục nếu chưa có):
 - KHÔNG advance step — đây là quyền của PM
 - Nếu bị block → ghi BLOCKER + NEEDS_SPECIALIST, tiếp tục làm những gì có thể
 """
-    brief_path.write_text(brief, encoding="utf-8")
+        brief_path.write_text(brief, encoding="utf-8")
 
-print("OK")
+    print("OK")
+
+except KeyError as e:
+    print(f"ERROR|brief_generation|missing key {e} in state or step data — kiểm tra flowctl-state.json", file=sys.stderr)
+    raise SystemExit(1)
+except (OSError, PermissionError) as e:
+    print(f"ERROR|brief_generation|file operation failed: {e}", file=sys.stderr)
+    raise SystemExit(1)
+except json.JSONDecodeError as e:
+    print(f"ERROR|brief_generation|JSON parse error: {e}", file=sys.stderr)
+    raise SystemExit(1)
+except Exception as e:
+    print(f"ERROR|brief_generation|unexpected error: {type(e).__name__}: {e}", file=sys.stderr)
+    raise SystemExit(1)
 PY
 
   echo -e "\n${GREEN}${BOLD}Dispatch bundles đã tạo:${NC} ${BOLD}${dispatch_dir#$REPO_ROOT/}${NC}"
@@ -277,17 +311,26 @@ for role in [primary] + supports:
 if role_filter:
     roles = [r for r in roles if r == role_filter]
 
+import shlex
+
 machine_lines = []
 for role in roles:
     brief_rel = (dispatch_dir / f"{role}-brief.md").relative_to(repo_root)
     print(f"  # @{role}")
-    prompt = f"Bạn là @{role}. Đọc brief tại {brief_rel} và thực hiện đúng yêu cầu."
+    # Use shlex.quote() to safely escape role/path values before embedding in shell commands.
+    # This prevents broken strings if role or paths contain quotes/special chars.
+    safe_role = role.replace('"', '\\"').replace("'", "\\'")
+    safe_brief = str(brief_rel).replace('"', '\\"')
+    prompt = f"Bạn là @{safe_role}. Đọc brief tại {safe_brief} và thực hiện đúng yêu cầu."
     trust_part = f"{trust_flag} " if trust_flag else ""
     role_chat = (role_sessions.get("roles", {}) or {}).get(role, {}).get("chat_id", "")
+    quoted_workspace = shlex.quote(str(repo_root))
+    quoted_prompt = shlex.quote(prompt)
     if role_chat:
-        cmd = f'agent {trust_part}--workspace "{repo_root}" --resume "{role_chat}" "{prompt}"'
+        quoted_chat = shlex.quote(str(role_chat))
+        cmd = f"agent {trust_part}--workspace {quoted_workspace} --resume {quoted_chat} {quoted_prompt}"
     else:
-        cmd = f'agent {trust_part}--workspace "{repo_root}" "{prompt}"'
+        cmd = f"agent {trust_part}--workspace {quoted_workspace} {quoted_prompt}"
     print(f"  {cmd}")
     machine_lines.append(f"{role}|{cmd}")
     print()
@@ -363,38 +406,88 @@ PY
       local idem_key="step:${step}:role:${role}:mode:headless"
       local idem_decision
       idem_decision=$(WF_IDEMPOTENCY_FILE="$IDEMPOTENCY_FILE" WF_IDEMPOTENCY_KEY="$idem_key" WF_FORCE_RUN="$force_run" WF_MAX_RETRIES="$max_retries" python3 - <<'PY'
-import json
-import os
+import json, os, fcntl, time, random, sys
 from pathlib import Path
+from datetime import datetime
 
 path = Path(os.environ["WF_IDEMPOTENCY_FILE"])
 key = os.environ["WF_IDEMPOTENCY_KEY"]
 force_run = os.environ.get("WF_FORCE_RUN", "false").lower() == "true"
 max_retries = int(os.environ.get("WF_MAX_RETRIES", "3"))
-data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-entry = data.get(key, {})
-status = entry.get("status", "")
-pid = entry.get("pid")
-attempt_count = int((entry.get("retry_policy") or {}).get("attempt_count", 0))
-running = False
-if isinstance(pid, int) and pid > 0:
-    try:
-        os.kill(pid, 0)
-        running = True
-    except OSError:
-        running = False
 
-if force_run:
-    print(f"LAUNCH|force-run enabled|prev_status={status or 'none'}")
-elif status == "launched" and running:
-    print(f"SKIP|already launched with running pid={pid}")
-elif status == "completed":
-    print("SKIP|already completed; use --force-run to rerun")
-elif attempt_count >= max_retries:
-    print(f"SKIP|retry budget exhausted ({attempt_count}/{max_retries}); use --force-run")
-else:
-    reason = "first launch" if not status else f"resume from status={status}"
-    print(f"LAUNCH|{reason}")
+# Atomic read-check-claim: hold LOCK_EX across the full cycle so concurrent
+# dispatches cannot both decide LAUNCH for the same key.
+lock_path = str(path) + ".lock"
+deadline = time.monotonic() + 10  # max 10s waiting for lock
+
+lock_fd = open(lock_path, "w")
+try:
+    while True:
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            break
+        except BlockingIOError:
+            if time.monotonic() > deadline:
+                print("LAUNCH|lock-timeout; proceeding in degraded mode", file=sys.stderr)
+                break
+            time.sleep(0.05 + random.uniform(0, 0.05))
+
+    data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    entry = data.get(key, {})
+    status = entry.get("status", "")
+    pid = entry.get("pid")
+    attempt_count = int((entry.get("retry_policy") or {}).get("attempt_count", 0))
+    running = False
+    if isinstance(pid, int) and pid > 0:
+        try:
+            os.kill(pid, 0)
+            running = True
+        except OSError:
+            running = False
+
+    if force_run:
+        decision = f"LAUNCH|force-run enabled|prev_status={status or 'none'}"
+    elif status == "launched" and running:
+        decision = f"SKIP|already launched with running pid={pid}"
+    elif status == "launching":
+        # Another dispatch claimed this slot — check age to handle crashes
+        launched_at = entry.get("launching_at", "")
+        age = 999
+        if launched_at:
+            try:
+                age = (datetime.now() - datetime.strptime(launched_at, "%Y-%m-%d %H:%M:%S")).total_seconds()
+            except Exception:
+                pass
+        if age < 60:
+            decision = "SKIP|another dispatch is mid-launch (launching state < 60s old)"
+        else:
+            decision = f"LAUNCH|stale launching state ({int(age)}s); retrying"
+    elif status == "completed":
+        decision = "SKIP|already completed; use --force-run to rerun"
+    elif attempt_count >= max_retries:
+        decision = f"SKIP|retry budget exhausted ({attempt_count}/{max_retries}); use --force-run"
+    else:
+        reason = "first launch" if not status else f"resume from status={status}"
+        decision = f"LAUNCH|{reason}"
+
+    # Claim the slot immediately while still holding the lock — prevents races
+    if decision.startswith("LAUNCH"):
+        prev = data.get(key, {})
+        data[key] = {
+            **prev,
+            "status": "launching",
+            "launching_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    print(decision)
+finally:
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+    except Exception:
+        pass
+    lock_fd.close()
 PY
 )
       if [[ "${idem_decision%%|*}" == "SKIP" ]]; then
@@ -418,37 +511,57 @@ PY
       nohup bash -lc "$headless_cmd" >/dev/null 2>&1 &
       local worker_pid=$!
       WF_IDEMPOTENCY_FILE="$IDEMPOTENCY_FILE" WF_IDEMPOTENCY_KEY="$idem_key" WF_STEP="$step" WF_ROLE="$role" WF_PID="$worker_pid" WF_LOG="$log_path" WF_REPORT="$report_path" WF_WORKFLOW_ID="$flow_id" WF_RUN_ID="$run_id" WF_CORRELATION_ID="$correlation_id" WF_MAX_RETRIES="$max_retries" python3 - <<'PY'
-import json
-import os
+import json, os, fcntl, time, random
 from datetime import datetime
 from pathlib import Path
 
 path = Path(os.environ["WF_IDEMPOTENCY_FILE"])
-data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
 key = os.environ["WF_IDEMPOTENCY_KEY"]
-prev = data.get(key, {})
-prev_retry = prev.get("retry_policy") or {}
-attempt_count = int(prev_retry.get("attempt_count", 0)) + 1
 max_retries = int(os.environ.get("WF_MAX_RETRIES", "3"))
-data[key] = {
-    "status": "launched",
-    "step": int(os.environ["WF_STEP"]),
-    "role": os.environ["WF_ROLE"],
-    "flow_id": os.environ["WF_WORKFLOW_ID"],
-    "run_id": os.environ["WF_RUN_ID"],
-    "correlation_id": os.environ["WF_CORRELATION_ID"],
-    "pid": int(os.environ["WF_PID"]),
-    "log_path": os.environ["WF_LOG"],
-    "report_path": os.environ["WF_REPORT"],
-    "retry_policy": {
-        "attempt_count": attempt_count,
-        "max_retries": max_retries,
-        "last_launch_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "last_failure_class": "",
-    },
-    "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-}
-path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+# Lock before updating PID — prevents overwriting a concurrent dispatch's entry
+lock_path = str(path) + ".lock"
+deadline = time.monotonic() + 10
+lock_fd = open(lock_path, "w")
+try:
+    while True:
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            break
+        except BlockingIOError:
+            if time.monotonic() > deadline:
+                break
+            time.sleep(0.05 + random.uniform(0, 0.05))
+
+    data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    prev = data.get(key, {})
+    prev_retry = prev.get("retry_policy") or {}
+    attempt_count = int(prev_retry.get("attempt_count", 0)) + 1
+    data[key] = {
+        "status": "launched",
+        "step": int(os.environ["WF_STEP"]),
+        "role": os.environ["WF_ROLE"],
+        "flow_id": os.environ["WF_WORKFLOW_ID"],
+        "run_id": os.environ["WF_RUN_ID"],
+        "correlation_id": os.environ["WF_CORRELATION_ID"],
+        "pid": int(os.environ["WF_PID"]),
+        "log_path": os.environ["WF_LOG"],
+        "report_path": os.environ["WF_REPORT"],
+        "retry_policy": {
+            "attempt_count": attempt_count,
+            "max_retries": max_retries,
+            "last_launch_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "last_failure_class": "",
+        },
+        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+finally:
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+    except Exception:
+        pass
+    lock_fd.close()
 PY
       launched=$((launched + 1))
     done < "$commands_file"
@@ -688,7 +801,9 @@ PY
     role_done="${role_done%-report.md}"
     wf_budget_mark_role_completed "$step" "$role_done"
     local report_rel="${rf#$REPO_ROOT/}"
-    local manifest_rel="workflows/runtime/evidence/step-${step}-manifest.json"
+    local manifest_rel
+    manifest_rel="$(wf_evidence_manifest_path "$step")"
+    manifest_rel="${manifest_rel#$REPO_ROOT/}"
     local trace_row
     trace_row=$(wf_traceability_record_task "$step" "$role_done" "$report_rel" "$manifest_rel" 2>/dev/null || true)
     if [[ -n "$trace_row" ]]; then

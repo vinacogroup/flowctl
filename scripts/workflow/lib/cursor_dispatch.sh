@@ -141,11 +141,16 @@ repo_root = '$REPO_ROOT'
 
 for role in roles:
     brief_path = f'workflows/dispatch/step-{step}/{role}-brief.md'
-    report_path = f'workflows/dispatch/step-{step}/reports/{role}-report.md'
+    report_abs  = os.path.join(dispatch_dir, 'reports', f'{role}-report.md')
+    report_rel  = f'workflows/dispatch/step-{step}/reports/{role}-report.md'
+    reports_dir = os.path.join(dispatch_dir, 'reports')
     print(f'  Spawn @{role}:')
     print(f'    subagent_type: {role}')
     print(f'    description: Execute step-{step} tasks as @{role}')
-    print(f'    instructions: Read @{brief_path} then execute. Write report to {report_path}')
+    print(f'    instructions: Read @{brief_path} then execute.')
+    print(f'      Write report to ABSOLUTE path: {report_abs}')
+    print(f'      (relative from project root: {report_rel})')
+    print(f'      Run first if dir missing: mkdir -p {reports_dir}')
     print()
 "
 

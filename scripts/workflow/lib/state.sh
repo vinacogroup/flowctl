@@ -15,60 +15,93 @@ print(val if val is not None else '')
 wf_json_set() {
   # $1 = dot-path, $2 = value (string), $3 = type (string|number|null)
   python3 -c "
-import json, fcntl
+import json, fcntl, time, random, sys
 from datetime import datetime
 
-with open('$STATE_FILE', 'r+') as f:
-    fcntl.flock(f, fcntl.LOCK_EX)
-    data = json.load(f)
+MAX_RETRIES = 8
+for attempt in range(MAX_RETRIES):
+    try:
+        with open('$STATE_FILE', 'r+') as f:
+            # Retry with exponential backoff until lock is acquired
+            for lock_attempt in range(10):
+                try:
+                    fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if lock_attempt == 9:
+                        raise RuntimeError('Could not acquire state lock after retries')
+                    time.sleep(0.05 * (2 ** lock_attempt) + random.uniform(0, 0.01))
+            data = json.load(f)
 
-    keys = '$1'.split('.')
-    obj = data
-    for k in keys[:-1]:
-        obj = obj.setdefault(k, {})
+            keys = '$1'.split('.')
+            obj = data
+            for k in keys[:-1]:
+                obj = obj.setdefault(k, {})
 
-    val = '$2'
-    typ = '${3:-string}'
-    if typ == 'number':
-        obj[keys[-1]] = int(val)
-    elif typ == 'null' or val == 'null':
-        obj[keys[-1]] = None
-    elif typ == 'bool':
-        obj[keys[-1]] = val.lower() == 'true'
-    else:
-        obj[keys[-1]] = val
+            val = '$2'
+            typ = '${3:-string}'
+            if typ == 'number':
+                obj[keys[-1]] = int(val)
+            elif typ == 'null' or val == 'null':
+                obj[keys[-1]] = None
+            elif typ == 'bool':
+                obj[keys[-1]] = val.lower() == 'true'
+            else:
+                obj[keys[-1]] = val
 
-    data['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            data['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    f.seek(0)
-    f.truncate()
-    json.dump(data, f, indent=2, ensure_ascii=False)
+            f.seek(0)
+            f.truncate()
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        break  # success
+    except (json.JSONDecodeError, ValueError):
+        if attempt == MAX_RETRIES - 1:
+            print(f'[wf_json_set] JSON decode error after {MAX_RETRIES} attempts', file=sys.stderr)
+            raise
+        time.sleep(0.1 * (attempt + 1))
 " 2>/dev/null
 }
 
 wf_json_append() {
   # $1 = dot-path to array, $2 = JSON object string
   python3 -c "
-import json, fcntl
+import json, fcntl, time, random, sys
 from datetime import datetime
 
-with open('$STATE_FILE', 'r+') as f:
-    fcntl.flock(f, fcntl.LOCK_EX)
-    data = json.load(f)
+MAX_RETRIES = 8
+for attempt in range(MAX_RETRIES):
+    try:
+        with open('$STATE_FILE', 'r+') as f:
+            for lock_attempt in range(10):
+                try:
+                    fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if lock_attempt == 9:
+                        raise RuntimeError('Could not acquire state lock after retries')
+                    time.sleep(0.05 * (2 ** lock_attempt) + random.uniform(0, 0.01))
+            data = json.load(f)
 
-    keys = '$1'.split('.')
-    obj = data
-    for k in keys[:-1]:
-        obj = obj[k]
+            keys = '$1'.split('.')
+            obj = data
+            for k in keys[:-1]:
+                obj = obj[k]
 
-    arr = obj.setdefault(keys[-1], [])
-    arr.append(json.loads('''$2'''))
+            arr = obj.setdefault(keys[-1], [])
+            arr.append(json.loads('''$2'''))
 
-    data['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            data['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    f.seek(0)
-    f.truncate()
-    json.dump(data, f, indent=2, ensure_ascii=False)
+            f.seek(0)
+            f.truncate()
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        break  # success
+    except (json.JSONDecodeError, ValueError):
+        if attempt == MAX_RETRIES - 1:
+            print(f'[wf_json_append] JSON decode error after {MAX_RETRIES} attempts', file=sys.stderr)
+            raise
+        time.sleep(0.1 * (attempt + 1))
 " 2>/dev/null
 }
 

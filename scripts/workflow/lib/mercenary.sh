@@ -18,6 +18,11 @@ from pathlib import Path
 reports_dir = Path("$reports_dir")
 requests = []
 
+# Guard: always output valid JSON even if reports dir doesn't exist
+if not reports_dir.exists():
+    print("[]")
+    raise SystemExit(0)
+
 for report_file in sorted(reports_dir.glob("*-report.md")):
     role = report_file.stem.replace("-report", "")
     content = report_file.read_text(encoding="utf-8")
@@ -103,6 +108,18 @@ for i, r in enumerate(requests, 1):
 }
 
 _mercenary_spawn_board() {
+  local mercenary_timeout="3600"  # default: 1h per mercenary task (L-03)
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --timeout)
+        mercenary_timeout="${2:-3600}"
+        [[ "$mercenary_timeout" =~ ^[0-9]+$ ]] || mercenary_timeout="3600"
+        shift 2
+        ;;
+      *) shift ;;
+    esac
+  done
+
   local step
   step=$(wf_require_initialized_workflow)
   local step_name
@@ -193,7 +210,39 @@ for i, r in enumerate(requests, 1):
     mtype = r.get('type','researcher')
     print(f'  flowctl dispatch --role {role}  # re-run @{role} với mercenary output')
 "
-  echo ""
+  echo -e "\n  ${YELLOW}Timeout:${NC} nếu mercenary không hoàn thành trong ${mercenary_timeout}s, re-run thủ công."
+  echo -e "  ${YELLOW}Tip:${NC} dùng ${BOLD}flowctl mercenary spawn --timeout <seconds>${NC} để thay đổi.\n"
+}
+
+# Wait for all mercenary output files to appear, with timeout.
+# Usage: wf_mercenary_wait_outputs <step> [timeout_seconds]
+# Returns 0 if all outputs present, 1 if timeout.
+wf_mercenary_wait_outputs() {
+  local step="$1"
+  local timeout_sec="${2:-3600}"
+  local merc_dir="$REPO_ROOT/workflows/dispatch/step-$step/mercenaries"
+  [[ -d "$merc_dir" ]] || { echo -e "${YELLOW}[mercenary] No mercenary dir for step $step.${NC}"; return 0; }
+
+  local deadline=$(( $(date +%s) + timeout_sec ))
+  local pending=1
+  while [[ $(date +%s) -lt $deadline ]]; do
+    pending=0
+    for brief in "$merc_dir"/*-brief.md; do
+      [[ -f "$brief" ]] || continue
+      local output="${brief%-brief.md}-output.md"
+      if [[ ! -f "$output" ]]; then
+        pending=1
+        break
+      fi
+    done
+    if [[ "$pending" -eq 0 ]]; then
+      echo -e "${GREEN}[mercenary] All outputs received.${NC}"
+      return 0
+    fi
+    sleep 10
+  done
+  echo -e "${RED}[mercenary] Timeout after ${timeout_sec}s — some outputs still missing.${NC}" >&2
+  return 1
 }
 
 # Inject mercenary outputs into a role's re-run context

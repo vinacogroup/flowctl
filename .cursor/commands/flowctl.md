@@ -15,6 +15,7 @@ Topic/context: $ARGUMENTS
 ```bash
 flowctl status
 flowctl complexity
+flowctl start     # ← advance step pending → in_progress (bắt buộc trước khi làm việc)
 ```
 
 Đọc **Tier** từ output (không chỉ score):

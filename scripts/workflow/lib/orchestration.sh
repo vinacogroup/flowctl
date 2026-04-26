@@ -1,5 +1,86 @@
 #!/usr/bin/env bash
 
+# Auto-clean idempotency entries where:
+#   - status is "launched" or "launching"
+#   - PID is dead (os.kill returns ESRCH)
+#   - entry age > STALE_PID_MAX_AGE_SECONDS (default: 7200 = 2h)
+# Marks cleaned entries as "stale_cleaned" so next dispatch can retry.
+wf_clean_stale_pids() {
+  local step="${1:-}"
+  local max_age="${2:-7200}"
+  [[ -f "$IDEMPOTENCY_FILE" ]] || return 0
+
+  local cleaned
+  cleaned=$(WF_IDEMPOTENCY_FILE="$IDEMPOTENCY_FILE" WF_STEP="$step" WF_MAX_AGE="$max_age" python3 - <<'PY'
+import json, os, time
+from pathlib import Path
+from datetime import datetime
+
+path = Path(os.environ["WF_IDEMPOTENCY_FILE"])
+step_filter = os.environ.get("WF_STEP", "")
+max_age = int(os.environ.get("WF_MAX_AGE", "7200"))
+now = time.time()
+
+data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+cleaned = []
+
+for key, entry in data.items():
+    if step_filter and f":step:{step_filter}:" not in f":step:{step_filter}:" and entry.get("step") != int(step_filter):
+        try:
+            if entry.get("step") != int(step_filter):
+                continue
+        except Exception:
+            continue
+
+    status = entry.get("status", "")
+    if status not in ("launched", "launching"):
+        continue
+
+    pid = entry.get("pid")
+    pid_alive = False
+    if isinstance(pid, int) and pid > 0:
+        try:
+            os.kill(pid, 0)
+            pid_alive = True
+        except OSError:
+            pid_alive = False
+
+    if pid_alive:
+        continue
+
+    # Check age via updated_at or launching_at
+    ts_str = entry.get("updated_at") or entry.get("launching_at", "")
+    age = max_age + 1  # default: treat as old if no timestamp
+    if ts_str:
+        try:
+            t = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
+            age = now - t.timestamp()
+        except Exception:
+            pass
+
+    if age > max_age:
+        entry["status"] = "stale_cleaned"
+        entry["stale_cleaned_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        entry["stale_reason"] = f"pid={pid} dead, age={int(age)}s > {max_age}s"
+        cleaned.append(key)
+
+if cleaned:
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+for c in cleaned:
+    print(c)
+PY
+)
+  if [[ -n "$cleaned" ]]; then
+    echo -e "${YELLOW}[stale-pids] Cleaned ${#cleaned} stale PID entries:${NC}"
+    echo "$cleaned" | while read -r key; do
+      echo -e "  ${YELLOW}→${NC} $key"
+    done
+  else
+    echo -e "${GREEN}[stale-pids] No stale PIDs found.${NC}"
+  fi
+}
+
 cmd_team() {
   local action="${1:-status}"
   shift || true
@@ -47,6 +128,7 @@ cmd_team() {
     monitor)
       local stale_seconds="300"
       local retry_delay_seconds="60"
+      local clean_stale_pids="false"
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --stale-seconds)
@@ -57,13 +139,20 @@ cmd_team() {
             retry_delay_seconds="${2:-60}"
             shift 2
             ;;
+          --stale-pids)
+            clean_stale_pids="true"
+            shift
+            ;;
           *)
             echo -e "${RED}Unknown option for team monitor: $1${NC}"
-            echo -e "Usage: flowctl team monitor [--stale-seconds N] [--retry-delay-seconds N]\n"
+            echo -e "Usage: flowctl team monitor [--stale-seconds N] [--retry-delay-seconds N] [--stale-pids]\n"
             exit 1
             ;;
         esac
       done
+      if [[ "$clean_stale_pids" == "true" ]]; then
+        wf_clean_stale_pids "$step"
+      fi
       [[ "$stale_seconds" =~ ^[0-9]+$ ]] || stale_seconds="300"
       [[ "$retry_delay_seconds" =~ ^[0-9]+$ ]] || retry_delay_seconds="60"
       echo -e "\n${BLUE}${BOLD}[TEAM] PM monitor${NC}"

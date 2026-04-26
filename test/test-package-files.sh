@@ -22,17 +22,36 @@ required_runtime_files = [
     "scripts/hooks",
     "scripts/workflow",
     "templates",
+    # Cursor agent/rule/skill dirs — must be packaged so `flowctl init` can scaffold them
+    ".cursor/agents",
+    ".cursor/commands",
+    ".cursor/rules",
+    ".cursor/skills",
+    ".cursorrules",
+    # Workflow dispatch/gate/policy templates
+    "workflows/dispatch",
+    "workflows/gates",
+    "workflows/policies",
 ]
 
 missing_from_package = [path for path in required_runtime_files if path not in declared_files]
-missing_on_disk = [path for path in required_runtime_files if not Path(path).exists()]
+missing_on_disk      = [path for path in required_runtime_files if not Path(path).exists()]
 
-if missing_from_package or missing_on_disk:
-    if missing_from_package:
-        print("Missing from package.json files:", ", ".join(missing_from_package), file=sys.stderr)
-    if missing_on_disk:
-        print("Missing on disk:", ", ".join(missing_on_disk), file=sys.stderr)
+errors = []
+if missing_from_package:
+    errors.append("Missing from package.json files: " + ", ".join(missing_from_package))
+if missing_on_disk:
+    errors.append("Missing on disk: " + ", ".join(missing_on_disk))
+
+# Verify bin/flowctl is executable
+bin_flowctl = Path("bin/flowctl")
+if bin_flowctl.exists() and not bin_flowctl.stat().st_mode & 0o111:
+    errors.append("bin/flowctl is not executable")
+
+if errors:
+    for e in errors:
+        print(e, file=sys.stderr)
     sys.exit(1)
 
-print("Package runtime files are declared.")
+print(f"Package files OK ({len(required_runtime_files)} paths verified)")
 PY
