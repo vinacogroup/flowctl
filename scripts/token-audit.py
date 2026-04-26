@@ -24,10 +24,14 @@ def cyn(t): return color(t, C)
 def bold(t): return color(t, B)
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-REPO_ROOT = Path(os.environ.get("REPO_ROOT", Path(__file__).parent.parent))
-CACHE_DIR  = REPO_ROOT / ".cache" / "mcp"
-EVENTS_FILE = CACHE_DIR / "events.jsonl"
-STATS_FILE  = CACHE_DIR / "session-stats.json"
+REPO_ROOT = Path(os.environ.get("FLOWCTL_PROJECT_ROOT",
+                  os.environ.get("REPO_ROOT", Path(__file__).parent.parent)))
+# Prefer FLOWCTL_CACHE_DIR / FLOWCTL_EVENTS_F / FLOWCTL_STATS_F set by flowctl.sh
+# (v1.1+ home dir layout). Fallback: legacy .cache/mcp/ in project root.
+_legacy_cache = REPO_ROOT / ".cache" / "mcp"
+CACHE_DIR   = Path(os.environ.get("FLOWCTL_CACHE_DIR",  str(_legacy_cache)))
+EVENTS_FILE = Path(os.environ.get("FLOWCTL_EVENTS_F",   str(CACHE_DIR / "events.jsonl")))
+STATS_FILE  = Path(os.environ.get("FLOWCTL_STATS_F",    str(CACHE_DIR / "session-stats.json")))
 GRAPHIFY_FILE = REPO_ROOT / ".graphify" / "graph.json"
 
 # ── Overhead tools: chạy để setup context, không phải actual work ────────────

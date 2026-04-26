@@ -75,6 +75,10 @@ source "$LIB_DIR/orchestration.sh"
 # shellcheck source=/dev/null
 source "$LIB_DIR/reporting.sh"
 
+# ── Export home dir env vars for subprocesses (node, python, bash) ──
+export FLOWCTL_HOME FLOWCTL_DATA_DIR FLOWCTL_CACHE_DIR FLOWCTL_RUNTIME_DIR \
+       FLOWCTL_EVENTS_F FLOWCTL_STATS_F
+
 # ── Commands ─────────────────────────────────────────────────
 
 ensure_project_scaffold() {
@@ -254,6 +258,72 @@ if not data.get('flow_id'):
 with open('$STATE_FILE', 'w') as f:
     json.dump(data, f, indent=2, ensure_ascii=False)
 "
+
+  # ── Create ~/.flowctl home dir structure ─────────────────────
+  # Recompute data dir now that flow_id is written (config.sh ran before init,
+  # so FLOWCTL_DATA_DIR may have been set to the fallback path).
+  local _new_fl_id _new_fl_name _new_short _new_slug
+  _new_fl_id=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('flow_id',''))" 2>/dev/null || echo "")
+  _new_fl_name="$project_name"
+
+  if [[ -n "$_new_fl_id" ]]; then
+    _new_short="${_new_fl_id:3:8}"
+    _new_slug=$(printf '%s' "$_new_fl_name" \
+      | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' \
+      | sed 's/^[-]*//;s/[-]*$//' | cut -c1-32)
+    [[ -z "$_new_slug" ]] && _new_slug="project"
+
+    FLOWCTL_DATA_DIR="$FLOWCTL_HOME/projects/${_new_slug}-${_new_short}"
+    FLOWCTL_CACHE_DIR="$FLOWCTL_DATA_DIR/cache"
+    FLOWCTL_RUNTIME_DIR="$FLOWCTL_DATA_DIR/runtime"
+    FLOWCTL_EVENTS_F="$FLOWCTL_CACHE_DIR/events.jsonl"
+    FLOWCTL_STATS_F="$FLOWCTL_CACHE_DIR/session-stats.json"
+    export FLOWCTL_DATA_DIR FLOWCTL_CACHE_DIR FLOWCTL_RUNTIME_DIR \
+           FLOWCTL_EVENTS_F FLOWCTL_STATS_F
+
+    # Create directory structure
+    mkdir -p \
+      "$FLOWCTL_CACHE_DIR" \
+      "$FLOWCTL_RUNTIME_DIR/evidence" \
+      "$FLOWCTL_RUNTIME_DIR/release-dashboard" \
+      "$FLOWCTL_HOME/projects"
+
+    # Write meta.json
+    python3 - <<PY
+import json
+from datetime import datetime
+meta = {
+    "project_id":    "$_new_fl_id",
+    "project_name":  "$_new_fl_name",
+    "path":          "$PROJECT_ROOT",
+    "cache_dir":     "$FLOWCTL_CACHE_DIR",
+    "runtime_dir":   "$FLOWCTL_RUNTIME_DIR",
+    "created_at":    datetime.now().isoformat(),
+    "last_seen":     datetime.now().isoformat(),
+}
+with open("$FLOWCTL_DATA_DIR/meta.json", "w") as f:
+    json.dump(meta, f, indent=2)
+PY
+  fi
+
+  # Create ~/.flowctl/config.json if it doesn't exist yet
+  if [[ ! -f "$FLOWCTL_HOME/config.json" ]]; then
+    mkdir -p "$FLOWCTL_HOME"
+    cat > "$FLOWCTL_HOME/config.json" <<'JSON'
+{
+  "version": 1,
+  "monitor": {
+    "default_port": 3170,
+    "auto_open_browser": true
+  },
+  "defaults": {
+    "budget_per_step": 12000,
+    "prune_after_days": 30
+  },
+  "theme": "dark"
+}
+JSON
+  fi
 
   if [[ "$run_setup" == "true" && "$is_new_project" == "true" ]]; then
     local setup_script="$WORKFLOW_ROOT/scripts/setup.sh"
@@ -710,6 +780,15 @@ with open('$STATE_FILE', 'w') as f: json.dump(d, f, indent=2, ensure_ascii=False
 # ── Main dispatcher ──────────────────────────────────────────
 CMD="${1:-status}"
 shift || true
+
+# Ensure home dirs exist for any command that writes runtime state
+# (skip for init — cmd_init() creates dirs itself after generating flow_id)
+case "$CMD" in
+  -v|--version|version|init|monitor|mon|mcp|help|-h|--help) ;;
+  *)
+    flowctl_ensure_data_dirs
+    ;;
+esac
 
 case "$CMD" in
   init|start|gate-check|approve|reject|conditional|blocker|decision|dispatch|cursor-dispatch|collect|team|reset|brainstorm|release-dashboard|war-room|mercenary|retro|complexity|audit-tokens|audit)

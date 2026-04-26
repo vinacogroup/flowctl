@@ -14,9 +14,14 @@ from pathlib import Path
 from datetime import datetime
 
 # Claude Code runs hooks with cwd = project root; FLOWCTL_PROJECT_ROOT overrides for manual use
-REPO    = Path(os.environ.get('FLOWCTL_PROJECT_ROOT', os.getcwd()))
-EVENTS  = REPO / ".cache" / "mcp" / "events.jsonl"
-STATS_F = REPO / ".cache" / "mcp" / "session-stats.json"
+REPO = Path(os.environ.get('FLOWCTL_PROJECT_ROOT', os.getcwd()))
+
+# Prefer FLOWCTL_EVENTS_F / FLOWCTL_STATS_F set by flowctl.sh (v1.1+ home dir layout).
+# Fallback: legacy .cache/mcp/ in project root for pre-v1.1 installs or hooks
+# spawned without the flowctl env vars (e.g. direct Claude Code invocation).
+_cache_default = REPO / ".cache" / "mcp"
+EVENTS  = Path(os.environ.get('FLOWCTL_EVENTS_F', str(_cache_default / "events.jsonl")))
+STATS_F = Path(os.environ.get('FLOWCTL_STATS_F',  str(_cache_default / "session-stats.json")))
 
 def _read_project_identity() -> tuple:
     state_f = REPO / "flowctl-state.json"

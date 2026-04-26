@@ -22,14 +22,18 @@ import { homedir } from 'os';
 // Fallback: FLOWCTL_PROJECT_ROOT env var for manual / non-Cursor invocations.
 const __file      = fileURLToPath(import.meta.url);
 const REPO        = resolve(process.env.FLOWCTL_PROJECT_ROOT || process.cwd());
-const CACHE       = join(REPO, '.cache', 'mcp');
-const GEN_FILE    = join(CACHE, '_gen.json');
-const BASELINE_F  = join(CACHE, '_baselines.json');
-const EVENTS_F    = join(CACHE, 'events.jsonl');
-const STATS_F     = join(CACHE, 'session-stats.json');
 const STATE       = join(REPO, 'flowctl-state.json');
 const FLOWCTL_HOME = join(homedir(), '.flowctl');
 const REGISTRY_F   = join(FLOWCTL_HOME, 'registry.json');
+
+// ── Cache dir: prefer FLOWCTL_CACHE_DIR (set by flowctl.sh) ───
+// Fallback: legacy .cache/mcp/ in project root (pre-v1.1 installs or
+// when MCP server is spawned without the flowctl env vars).
+const CACHE      = resolve(process.env.FLOWCTL_CACHE_DIR   || join(REPO, '.cache', 'mcp'));
+const EVENTS_F   = resolve(process.env.FLOWCTL_EVENTS_F    || join(CACHE, 'events.jsonl'));
+const STATS_F    = resolve(process.env.FLOWCTL_STATS_F     || join(CACHE, 'session-stats.json'));
+const GEN_FILE   = join(CACHE, '_gen.json');
+const BASELINE_F = join(CACHE, '_baselines.json');
 
 // ── Project identity — read once at startup ────────────────────
 function readProjectIdentity() {

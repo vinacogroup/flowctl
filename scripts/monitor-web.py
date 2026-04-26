@@ -25,10 +25,14 @@ def _detect_repo() -> Path:
     return _script_parent  # local install fallback
 
 REPO         = _detect_repo()
-CACHE        = REPO / ".cache" / "mcp"
-EVENTS_F     = CACHE / "events.jsonl"
-STATS_F      = CACHE / "session-stats.json"
 STATE_F      = REPO / "flowctl-state.json"
+
+# Prefer FLOWCTL_CACHE_DIR / _EVENTS_F / _STATS_F set by flowctl.sh (v1.1+ home dir layout).
+# Fallback: legacy .cache/mcp/ inside the project root (pre-v1.1 or no env vars).
+_legacy_cache = REPO / ".cache" / "mcp"
+CACHE    = Path(_os.environ.get("FLOWCTL_CACHE_DIR", str(_legacy_cache)))
+EVENTS_F = Path(_os.environ.get("FLOWCTL_EVENTS_F",  str(CACHE / "events.jsonl")))
+STATS_F  = Path(_os.environ.get("FLOWCTL_STATS_F",   str(CACHE / "session-stats.json")))
 
 THRESHOLDS   = {"bash_waste_per_event": 400, "cache_hit_rate_min": 0.65}
 STEP_BUDGETS  = {1:8000,2:12000,3:10000,4:18000,5:18000,6:14000,7:12000,8:10000,9:8000}
@@ -45,6 +49,30 @@ def load_registry() -> dict:
     except Exception:
         return {"projects": {}}
 
+def _enrich_from_meta(proj: dict) -> dict:
+    """Try to fill missing cache_dir from ~/.flowctl/projects/*/meta.json (v1.1+ layout)."""
+    if proj.get("cache_dir"):
+        return proj
+    pid = proj.get("project_id", "")
+    if not pid:
+        return proj
+    # Search home dir for a meta.json whose project_id matches
+    projects_dir = FLOWCTL_HOME / "projects"
+    if projects_dir.exists():
+        for entry in projects_dir.iterdir():
+            meta_f = entry / "meta.json"
+            if meta_f.exists():
+                try:
+                    meta = json.loads(meta_f.read_text())
+                    if meta.get("project_id") == pid:
+                        proj = dict(proj)
+                        proj["cache_dir"]   = meta.get("cache_dir",   str(entry / "cache"))
+                        proj["runtime_dir"] = meta.get("runtime_dir", str(entry / "runtime"))
+                        return proj
+                except Exception:
+                    pass
+    return proj
+
 def discover_projects() -> dict:
     """All projects in registry + always include current REPO if it has a state file."""
     reg    = load_registry()
@@ -58,6 +86,7 @@ def discover_projects() -> dict:
             last_ts = 0
         proj = dict(proj)
         proj["active"] = (now_ts - last_ts) < 600
+        proj = _enrich_from_meta(proj)   # fill cache_dir from meta.json if missing
         result[pid] = proj
 
     # Always include current directory (even if not yet in registry)
@@ -70,7 +99,8 @@ def discover_projects() -> dict:
                 "project_id":   pid,
                 "project_name": s.get("project_name", REPO.name),
                 "path":         str(REPO),
-                "cache_dir":    str(CACHE),
+                # Use env-var cache dir (set by flowctl.sh) or fallback to legacy path
+                "cache_dir":    _os.environ.get("FLOWCTL_CACHE_DIR", str(CACHE)),
                 "active":       True,
                 "last_seen":    datetime.now(timezone.utc).isoformat(),
             }
@@ -978,10 +1008,16 @@ def main():
     signal.signal(signal.SIGINT,  _stop)
     signal.signal(signal.SIGTERM, _stop)
 
-    # Start file watcher for SSE push (watches events + stats for changes)
+    # Start file watcher for SSE push
     watch_paths = [str(p) for p in [EVENTS_F, STATS_F] if p.exists()]
     if not watch_paths:
         watch_paths = [str(EVENTS_F)]  # watch even if not yet created
+    # In global mode: also watch all known project events files in home dir
+    if GLOBAL_MODE and (FLOWCTL_HOME / "projects").exists():
+        for entry in (FLOWCTL_HOME / "projects").iterdir():
+            ef = entry / "cache" / "events.jsonl"
+            if ef.exists() and str(ef) not in watch_paths:
+                watch_paths.append(str(ef))
     FileWatcher(watch_paths).start()
 
     print(f"[flowctl monitor] Dashboard: {url}")
