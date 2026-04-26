@@ -1,12 +1,12 @@
 {
   "name": "@vinacogroup/flowctl",
-  "version": "1.2.3",
+  "version": "0.0.1",
   "type": "module",
   "description": "Workflow Orchestration for Cursor",
   "private": false,
   "repository": {
     "type": "git",
-    "url": "https://github.com/vinacogroup/flowctl.git"
+    "url": "git+https://github.com/vinacogroup/flowctl.git"
   },
   "author": "Vinaco Group",
   "license": "MIT",
@@ -54,7 +54,7 @@
     }
   },
   "bin": {
-    "flowctl": "./bin/flowctl"
+    "flowctl": "bin/flowctl"
   },
   "scripts": {
     "setup-hooks": "node scripts/hooks/setup-git-hooks.mjs",
@@ -75,5 +75,13 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0"
+  },
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "test"
+  },
+  "bugs": {
+    "url": "https://github.com/vinacogroup/flowctl/issues"
   }
 }
