@@ -97,9 +97,12 @@ disk_reports = len(list(reports_dir.glob("*-report.md"))) if reports_dir.exists(
 # Khi runtime files bị gitignored / chưa collect, disk_reports = 0 nhưng
 # state.json vẫn có deliverables ghi nhận reports đã được tạo.
 # Dùng state deliverables làm fallback để không block approve sai.
+# NOTE: collect thêm deliverables dạng "path/to/foo-report.md — Worker report"
+# nên phải dùng `in` chứ không phải endswith (format không kết thúc bằng .md).
 state_report_deliverables = sum(
     1 for d in deliverables
-    if isinstance(d, str) and d.rstrip().endswith("-report.md")
+    if (isinstance(d, str) and "-report.md" in d)
+    or (isinstance(d, dict) and "-report.md" in (d.get("path", "") or ""))
 )
 report_count = disk_reports if disk_reports > 0 else state_report_deliverables
 report_source = "disk" if disk_reports > 0 else "state"

@@ -201,7 +201,10 @@ query_graph("tên component/flow cần hiểu")   ← chỉ cho code structure
 
 ## 📝 Report output — BẮT BUỘC
 
-Ghi vào: `{report_path.relative_to(repo_root)}`
+Ghi vào đường dẫn tuyệt đối này (tạo thư mục nếu chưa có):
+`{report_path}`
+
+*(relative: `{report_path.relative_to(repo_root)}`)*
 
 ```markdown
 # Worker Report — @{role} — Step {step}: {step_name}
@@ -516,11 +519,8 @@ cmd_collect() {
   step=$(wf_require_initialized_workflow)
 
   local reports_dir="$REPO_ROOT/workflows/dispatch/step-$step/reports"
-  if [[ ! -d "$reports_dir" ]]; then
-    echo -e "${YELLOW}Chưa có thư mục reports: ${reports_dir#$REPO_ROOT/}${NC}"
-    echo -e "Chạy ${BOLD}flowctl dispatch${NC} trước.\n"
-    exit 1
-  fi
+  # Tạo dir nếu chưa có (MICRO flow / PM-only không chạy dispatch trước)
+  mkdir -p "$reports_dir"
 
   local collect_raw
   collect_raw=$(python3 - <<PY

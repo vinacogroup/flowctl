@@ -29,18 +29,37 @@ flowctl complexity
 
 ### PHASE MICRO (chỉ khi tier = MICRO)
 
-**Không tạo brief file. Không chạy dispatch. Không cần collect.**
+**Không tạo brief file. Không chạy dispatch. Nhưng BẮT BUỘC viết report + collect trước khi approve.**
 
 1. PM xác định agent phù hợp nhất từ step config
-2. Spawn **1 agent** với task description ngắn gọn:
+2. Spawn **1 agent** với task description ngắn gọn — bao gồm yêu cầu viết report:
    ```
    Task(role: "[agent]", description: "[task ngắn gọn]",
-        instructions: "Context: [1-2 câu]. Task: [yêu cầu cụ thể]. Output: [expected result].")
+        instructions: "Context: [1-2 câu]. Task: [yêu cầu cụ thể]. Output: [expected result].
+        Sau khi xong, tạo thư mục workflows/dispatch/step-N/reports/ nếu chưa có,
+        rồi ghi report vào workflows/dispatch/step-N/reports/[role]-report.md với format:
+        ## DELIVERABLES\n- DELIVERABLE: path — mô tả
+        ## DECISIONS\n- DECISION: text (hoặc NONE)
+        ## BLOCKERS\n- BLOCKER: NONE")
    ```
 3. Khi agent xong, PM verify output trực tiếp (đọc file/kết quả)
-4. Nếu OK → `flowctl approve --by "PM" --note "micro task: [mô tả]"`
+4. Nếu agent **không tự viết report**, PM tự viết vào `workflows/dispatch/step-N/reports/pm-report.md`:
+   ```markdown
+   # Worker Report — @pm — Step N: [step name]
+   ## SUMMARY
+   [2-3 câu tóm tắt công việc đã làm]
+   ## DELIVERABLES
+   - DELIVERABLE: [path file đã tạo hoặc verify] — [mô tả]
+   ## DECISIONS
+   - DECISION: [quyết định nếu có]
+   ## BLOCKERS
+   - BLOCKER: NONE
+   ```
+5. **`flowctl collect`** ← BẮT BUỘC — cập nhật state với deliverables/decisions từ report
+6. **`flowctl gate-check`** ← verify trước khi approve
+7. Nếu gate pass → `flowctl approve --by "PM" --note "micro task: [mô tả]"`
 
-**Token budget MICRO: ~1,000 tokens total. Không vượt quá.**
+**Token budget MICRO: ~1,500 tokens total. Không vượt quá.**
 
 ---
 

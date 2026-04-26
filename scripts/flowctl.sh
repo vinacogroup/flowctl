@@ -339,7 +339,24 @@ with open('$STATE_FILE', 'w') as f:
       | sed 's/^[-]*//;s/[-]*$//' | cut -c1-32)
     [[ -z "$_new_slug" ]] && _new_slug="project"
 
-    FLOWCTL_DATA_DIR="$FLOWCTL_HOME/projects/${_new_slug}-${_new_short}"
+    # Reuse existing data dir if this flow_id already has one — prevents
+    # duplicate dirs when re-running `flowctl init` or renaming a project.
+    local _existing_data_dir=""
+    if [[ -d "$FLOWCTL_HOME/projects" ]]; then
+      for _entry in "$FLOWCTL_HOME/projects"/*/; do
+        local _meta="${_entry}meta.json"
+        if [[ -f "$_meta" ]] && grep -qF "\"$_new_fl_id\"" "$_meta" 2>/dev/null; then
+          _existing_data_dir="${_entry%/}"
+          break
+        fi
+      done
+    fi
+
+    if [[ -n "$_existing_data_dir" ]]; then
+      FLOWCTL_DATA_DIR="$_existing_data_dir"
+    else
+      FLOWCTL_DATA_DIR="$FLOWCTL_HOME/projects/${_new_slug}-${_new_short}"
+    fi
     FLOWCTL_CACHE_DIR="$FLOWCTL_DATA_DIR/cache"
     FLOWCTL_RUNTIME_DIR="$FLOWCTL_DATA_DIR/runtime"
     FLOWCTL_EVENTS_F="$FLOWCTL_CACHE_DIR/events.jsonl"
