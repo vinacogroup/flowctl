@@ -142,30 +142,56 @@ BROADCASTER = SSEBroadcaster()
 # -- File watcher (poll mtime every 200ms, no external deps) -------------------
 
 class FileWatcher(threading.Thread):
-    """Poll file mtimes every 200ms. On change → broadcast fresh data to all SSE clients."""
-    def __init__(self, paths: list, interval: float = 0.2):
+    """
+    Poll file mtimes. On change → broadcast typed SSE event:
+      {type:"project_update", project_id, data}
+    paths_map: {filepath: meta_dict | None}
+      None  → current project (calls build_api_data(), uses STATE_F for project_id)
+      dict  → {project_id, cache_dir, state_path} for a non-current project
+    Interval: 200ms for current project files, 500ms for others.
+    """
+    def __init__(self, paths_map: dict, current_interval: float = 0.2, other_interval: float = 0.5):
         super().__init__(daemon=True, name="FileWatcher")
-        self.paths    = list(paths)
-        self.interval = interval
+        self._map     = dict(paths_map)   # {path: meta | None}
+        self._cur_iv  = current_interval
+        self._oth_iv  = other_interval
         self._mtimes: dict = {}
+        self._lock    = threading.Lock()
 
-    def add_path(self, path: str):
-        self.paths.append(path)
+    def add_paths(self, paths_map: dict):
+        with self._lock:
+            self._map.update(paths_map)
 
     def run(self):
+        cycle = 0
         while True:
-            for path in self.paths:
+            check_other = (cycle % max(1, round(self._oth_iv / self._cur_iv)) == 0)
+            with self._lock:
+                items = list(self._map.items())
+            for path, meta in items:
+                is_current = (meta is None)
+                if not is_current and not check_other:
+                    continue
                 try:
                     mtime = _os.stat(path).st_mtime
                     if self._mtimes.get(path) != mtime:
                         self._mtimes[path] = mtime
                         try:
-                            BROADCASTER.broadcast(build_api_data())
+                            if is_current:
+                                data = build_api_data()
+                                pid  = data.get("project_id", "")
+                            else:
+                                pid  = meta["project_id"]
+                                data = build_project_data(
+                                    meta["cache_dir"], meta["state_path"]
+                                )
+                            BROADCASTER.broadcast({"type": "project_update", "project_id": pid, "data": data})
                         except Exception:
                             pass
                 except FileNotFoundError:
                     pass
-            time.sleep(self.interval)
+            cycle += 1
+            time.sleep(self._cur_iv)
 
 # -- Data loading (same sources as monitor.py) ---------------------------------
 
@@ -476,17 +502,65 @@ tr:hover td{background:var(--elevated)}
 .c-red{color:var(--red)}.c-muted{color:var(--muted)}
 .empty td{color:var(--muted);font-style:italic;text-align:left!important}
 
-.project-tabs{display:flex;gap:4px;flex-wrap:wrap}
-.ptab{padding:2px 10px;border-radius:4px;border:1px solid var(--border);
-  background:var(--elevated);color:var(--muted);font-size:11px;cursor:pointer;
-  font-family:var(--mono);transition:color .2s,border-color .2s,background .2s}
-.ptab:hover{color:var(--text);border-color:var(--blue)}
-.ptab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
-.ptab .pdot{display:inline-block;width:5px;height:5px;border-radius:50%;
-  background:var(--muted);margin-right:4px;vertical-align:middle}
-.ptab .pdot.live{background:var(--green);box-shadow:0 0 4px var(--green)}
-.overview-panel{background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--r);overflow:hidden;margin-bottom:8px}
+/* ── Project Switcher dropdown ─────────────────────────── */
+.sw-wrap{position:relative;display:inline-block}
+.sw-btn{display:flex;align-items:center;gap:6px;padding:3px 10px;border-radius:5px;
+  border:1px solid var(--border);background:var(--elevated);color:var(--text);
+  font-size:11px;font-family:var(--mono);cursor:pointer;transition:border-color .2s}
+.sw-btn:hover{border-color:var(--blue)}
+.sw-btn .sw-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.sw-btn .sw-dot.live{background:var(--green);box-shadow:0 0 4px var(--green)}
+.sw-btn .sw-caret{color:var(--muted);font-size:9px;margin-left:2px}
+.sw-menu{display:none;position:absolute;top:calc(100% + 4px);left:0;min-width:230px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:100;overflow:hidden}
+.sw-menu.open{display:block}
+.sw-item{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;
+  font-size:11px;transition:background .15s;font-family:var(--mono)}
+.sw-item:hover{background:var(--elevated)}
+.sw-item.active{background:rgba(59,130,246,.12);color:var(--blue)}
+.sw-item .pdot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.sw-item .pdot.live{background:var(--green);box-shadow:0 0 4px var(--green)}
+.sw-item .pdot.idle{background:var(--amber)}
+.sw-item-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sw-item-meta{font-size:10px;color:var(--muted);white-space:nowrap}
+.sw-divider{height:1px;background:var(--border);margin:3px 0}
+.sw-all{color:var(--blue)}
+.sw-settings{color:var(--muted);font-size:10px}
+/* ── Project Cards (All view) ──────────────────────────── */
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+  gap:8px;margin-bottom:8px}
+.project-card{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r);padding:12px;cursor:pointer;transition:border-color .2s}
+.project-card:hover{border-color:var(--blue)}
+.pc-header{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.pc-name{font-weight:600;font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc-step{font-size:10px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
+.pc-stats{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px;line-height:1.8}
+.pc-footer{display:flex;align-items:center;justify-content:space-between;font-size:10px}
+.pc-eff{color:var(--green);font-family:var(--mono)}
+.pc-blk{color:var(--red)}
+.pc-open{padding:2px 8px;border-radius:4px;border:1px solid var(--border);
+  background:var(--elevated);color:var(--blue);font-size:10px;cursor:pointer;
+  transition:background .15s}
+.pc-open:hover{background:var(--border)}
+/* ── Settings Panel ────────────────────────────────────── */
+.settings-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200}
+.settings-overlay.open{display:flex;align-items:center;justify-content:center}
+.settings-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:20px;min-width:300px;max-width:420px;width:90%}
+.settings-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:14px}
+.settings-row{display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:10px;font-size:12px;color:var(--muted)}
+.settings-row input[type=number]{width:70px;background:var(--elevated);border:1px solid var(--border);
+  border-radius:4px;color:var(--text);padding:3px 6px;font-family:var(--mono);font-size:12px}
+.settings-row input[type=checkbox]{accent-color:var(--blue);width:14px;height:14px;cursor:pointer}
+.settings-actions{display:flex;gap:8px;margin-top:16px;justify-content:flex-end}
+.settings-save{padding:4px 14px;border-radius:5px;border:none;background:var(--blue);
+  color:#fff;font-size:12px;cursor:pointer}
+.settings-cancel{padding:4px 14px;border-radius:5px;border:1px solid var(--border);
+  background:var(--elevated);color:var(--muted);font-size:12px;cursor:pointer}
+.settings-cancel:hover{color:var(--text)}
 
 @media(max-width:768px){.stats,.main{grid-template-columns:1fr}}
 </style>
@@ -495,9 +569,14 @@ tr:hover td{background:var(--elevated)}
 
 <div class="hdr">
   <span class="hdr-title">&#9670; FLOWCTL</span>
-  <div class="project-tabs" id="project-tabs"></div>
-  <span class="sep">|</span>
-  <span id="hproject" class="hdr-project">-</span>
+  <div class="sw-wrap" id="sw-wrap">
+    <button class="sw-btn" id="sw-btn" onclick="toggleSwitcher(event)">
+      <span class="sw-dot" id="sw-dot"></span>
+      <span id="sw-label">-</span>
+      <span class="sw-caret">&#9660;</span>
+    </button>
+    <div class="sw-menu" id="sw-menu"></div>
+  </div>
   <span class="sep">|</span>
   <span id="hstep" class="hdr-step">Step -</span>
   <span id="hsname" class="hdr-sname"></span>
@@ -506,6 +585,21 @@ tr:hover td{background:var(--elevated)}
   <button class="btn" id="pbtn" onclick="togglePause()">Pause</button>
   <span class="live" id="ldot">LIVE</span>
   <span class="hdr-time" id="htime"></span>
+</div>
+
+<!-- Settings modal -->
+<div class="settings-overlay" id="settings-overlay" onclick="closeSettings(event)">
+  <div class="settings-panel" onclick="event.stopPropagation()">
+    <div class="settings-title">&#9881; Dashboard Settings</div>
+    <div class="settings-row"><span>Monitor Port</span><input type="number" id="cfg-port" value="3170" min="1024" max="65535"></div>
+    <div class="settings-row"><span>Auto-open browser</span><input type="checkbox" id="cfg-browser" checked></div>
+    <div class="settings-row"><span>Show idle projects</span><input type="checkbox" id="cfg-idle" checked></div>
+    <div class="settings-row"><span>Idle threshold (min)</span><input type="number" id="cfg-idle-min" value="10" min="1" max="1440"></div>
+    <div class="settings-actions">
+      <button class="settings-cancel" onclick="closeSettings()">Cancel</button>
+      <button class="settings-save" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
 </div>
 
 <div class="stats">
@@ -714,53 +808,112 @@ function render(d) {
   }
 }
 
-// ── Project tabs (multi-project) ─────────────────────────────
+// ── Project Switcher ─────────────────────────────────────────
 // _activePid sentinel values:
-//   undefined  = live SSE mode (current project, auto-updates)
-//   null       = "All Projects" aggregate view (static, no SSE overwrite)
-//   'wf-...'   = specific project view (static, no SSE overwrite)
+//   undefined  = live SSE mode (current project, auto-updates via SSE)
+//   null       = "All Projects" aggregate + cards view
+//   'wf-...'   = specific project static view
 let _projects  = {};
 let _activePid = undefined;
+let _curPid    = '';  // project_id of the current (local) project
+
+function _sortedProjects() {
+  return Object.values(_projects)
+    .sort((a,b) => {
+      const sa = a.sort_key || [2,999999];
+      const sb = b.sort_key || [2,999999];
+      return sa[0] !== sb[0] ? sa[0] - sb[0] : sa[1] - sb[1];
+    });
+}
+
+function _ageSuffix(secs) {
+  if (!secs || secs >= 999999) return 'idle';
+  if (secs < 60)   return secs + 's ago';
+  if (secs < 3600) return Math.floor(secs/60) + 'm ago';
+  return Math.floor(secs/3600) + 'h ago';
+}
+
+function _dotClass(p) {
+  const s = p.active_seconds_ago || 999999;
+  if (s < 600)   return 'live';
+  if (s < 3600)  return 'idle';
+  return '';
+}
 
 function fetchProjects() {
   fetch('/api/projects').then(r => r.json()).then(d => {
     _projects = d.projects || {};
-    renderTabs();
-    // Re-render selected view on each fetchProjects refresh (every 5s)
-    if (Object.keys(_projects).length > 1 && _activePid !== undefined) {
-      renderProjectView(_activePid);
-    }
+    renderSwitcher();
+    if (_activePid !== undefined) renderProjectView(_activePid);
   }).catch(() => {});
 }
 
-function renderTabs() {
-  const el  = document.getElementById('project-tabs');
-  if (!el) return;
-  const ids = Object.keys(_projects);
-  if (ids.length <= 1) { el.innerHTML = ''; return; }
+function toggleSwitcher(e) {
+  e.stopPropagation();
+  document.getElementById('sw-menu').classList.toggle('open');
+}
+document.addEventListener('click', () => {
+  document.getElementById('sw-menu')?.classList.remove('open');
+});
 
-  const allBtn = `<button class="ptab${_activePid===null?' active':''}" onclick="selectProject(null)">All&thinsp;(${ids.length})</button>`;
-  const tabs = ids.map(pid => {
-    const p   = _projects[pid] || {};
-    const dot = p.active ? 'live' : '';
-    const act = _activePid === pid ? ' active' : '';
-    return `<button class="ptab${act}" onclick="selectProject('${esc(pid)}')">` +
-           `<span class="pdot ${dot}"></span>${esc(p.project_name || pid)}</button>`;
+function renderSwitcher() {
+  const btn  = document.getElementById('sw-btn');
+  const menu = document.getElementById('sw-menu');
+  const dot  = document.getElementById('sw-dot');
+  const lbl  = document.getElementById('sw-label');
+  if (!menu) return;
+
+  const sorted = _sortedProjects();
+  const multi  = sorted.length > 1;
+
+  // Update button label
+  if (_activePid === null) {
+    lbl.textContent = `All Projects (${sorted.length})`;
+    dot.className   = 'sw-dot';
+  } else if (_activePid && _projects[_activePid]) {
+    const p = _projects[_activePid];
+    lbl.textContent = p.project_name || _activePid;
+    dot.className   = 'sw-dot ' + _dotClass(p);
+  } else if (_curPid && _projects[_curPid]) {
+    const p = _projects[_curPid];
+    lbl.textContent = p.project_name || _curPid;
+    dot.className   = 'sw-dot ' + _dotClass(p);
+  } else {
+    lbl.textContent = '-';
+    dot.className   = 'sw-dot';
+  }
+
+  if (!multi) { menu.innerHTML = ''; return; }
+
+  const items = sorted.map(p => {
+    const act  = _activePid === p.project_id ? ' active' : '';
+    const dc   = _dotClass(p);
+    const age  = _ageSuffix(p.active_seconds_ago);
+    const step = p.step ? `Step ${p.step}` : '';
+    return `<div class="sw-item${act}" onclick="selectProject('${esc(p.project_id)}');document.getElementById('sw-menu').classList.remove('open')">
+      <span class="pdot ${dc}"></span>
+      <span class="sw-item-name">${esc(p.project_name||p.project_id)}</span>
+      <span class="sw-item-meta">${esc(step)}&nbsp;&nbsp;${esc(age)}</span>
+    </div>`;
   }).join('');
-  el.innerHTML = allBtn + tabs;
+  const allAct = _activePid === null ? ' active' : '';
+  menu.innerHTML = items
+    + `<div class="sw-divider"></div>`
+    + `<div class="sw-item sw-all${allAct}" onclick="selectProject(null);document.getElementById('sw-menu').classList.remove('open')">&#9671; All Projects (${sorted.length})</div>`
+    + `<div class="sw-divider"></div>`
+    + `<div class="sw-item sw-settings" onclick="openSettings();document.getElementById('sw-menu').classList.remove('open')">&#9881; Settings</div>`;
 }
 
 function selectProject(pid) {
   _activePid = pid;
-  renderTabs();
+  renderSwitcher();
   renderProjectView(pid);
 }
 
 function renderProjectView(pid) {
-  document.getElementById('overview-panel')?.remove();
+  document.getElementById('cards-panel')?.remove();
   if (pid === null) {
-    // "All Projects" aggregate view
-    const ps  = Object.values(_projects).filter(p => !p.error);
+    const ps  = _sortedProjects().filter(p => !p.error);
     const tot = { consumed:0, saved:0, cost_usd:0, saved_usd:0, waste_tok:0 };
     ps.forEach(p => {
       tot.consumed  += p.consumed  || 0;
@@ -772,24 +925,24 @@ function renderProjectView(pid) {
     const s = tot.consumed + tot.saved;
     render({
       ...tot,
-      project_name:  `All Projects (${ps.length})`,
-      project_id:    '',
-      eff_pct:       s ? Math.round(tot.saved / s * 100) : 0,
-      budget:        0, bud_pct: 0, step: null, step_name: '',
-      tools:         _mergeTools(ps), calls: _mergeCalls(ps),
-      activity:      [], alerts:  [], duration: '--:--:--',
-      ts:            new Date().toLocaleTimeString(),
+      project_name: `All Projects (${ps.length})`,
+      project_id:   '',
+      eff_pct:      s ? Math.round(tot.saved/s*100) : 0,
+      budget: 0, bud_pct: 0, step: null, step_name: '',
+      tools: _mergeTools(ps), calls: _mergeCalls(ps),
+      activity: [], alerts: [], duration: '--:--:--',
+      ts: new Date().toLocaleTimeString(),
     });
-    _renderOverview(ps);
+    _renderCards(ps);
   } else {
     const p = _projects[pid];
     if (!p || p.error) return;
     const s = (p.consumed||0) + (p.saved||0);
     render({
       ...p,
-      eff_pct:  s ? Math.round(p.saved / s * 100) : 0,
+      eff_pct:  s ? Math.round(p.saved/s*100) : 0,
       budget:   12000,
-      bud_pct:  p.consumed ? Math.round(p.consumed / 12000 * 100) : 0,
+      bud_pct:  p.consumed ? Math.round(p.consumed/12000*100) : 0,
       alerts:   p.open_blockers ? [`${p.open_blockers} open blocker(s)`] : [],
       duration: '--:--:--',
       ts:       new Date().toLocaleTimeString(),
@@ -804,7 +957,7 @@ function _mergeTools(projects) {
     m[t.name].calls += t.calls; m[t.name].hits += t.hits; m[t.name].saved += t.saved;
   }));
   return Object.values(m)
-    .map(t => ({...t, rate: t.calls ? t.hits / t.calls : 0}))
+    .map(t => ({...t, rate: t.calls ? t.hits/t.calls : 0}))
     .sort((a,b) => b.calls - a.calls);
 }
 
@@ -815,34 +968,82 @@ function _mergeCalls(projects) {
     .slice(0, 40);
 }
 
-function _renderOverview(projects) {
-  const panel = document.createElement('div');
-  panel.id = 'overview-panel'; panel.className = 'overview-panel';
-  const rows = projects.map(p => {
-    const dot = p.active
-      ? '<span style="color:var(--green)">&#9679;</span>'
-      : '<span style="color:var(--muted)">&#9675;</span>';
-    const blk = p.open_blockers
-      ? `<span style="color:var(--red)">&#9888;${esc(p.open_blockers)}</span>` : '-';
-    return `<tr>
-      <td>${dot} <span class="c-blue" style="cursor:pointer"
-        onclick="selectProject('${esc(p.project_id)}')">${esc(p.project_name)}</span></td>
-      <td class="c-muted">Step ${esc(p.step||'-')}</td>
-      <td>${blk}</td>
-      <td class="c-green">+${esc(fmt(p.saved||0))}</td>
-      <td class="c-muted" style="font-size:10px">${esc((p.today_saved||0).toLocaleString())}</td>
-    </tr>`;
-  }).join('');
-  panel.innerHTML = `<div class="ptitle">Projects Overview</div>
-    <table><thead><tr>
-      <th>Project</th><th>Step</th><th>Blockers</th><th>Saved (all)</th><th>Today</th>
-    </tr></thead><tbody>${rows}</tbody></table>`;
+function _renderCards(projects) {
+  const grid = document.createElement('div');
+  grid.id = 'cards-panel'; grid.className = 'cards-grid';
+
+  if (!projects.length) {
+    grid.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:12px">No projects yet. Run <code>flowctl init</code> to start.</div>';
+  } else {
+    grid.innerHTML = projects.map(p => {
+      const dc   = _dotClass(p);
+      const s    = (p.consumed||0) + (p.saved||0);
+      const eff  = s ? Math.round(p.saved/s*100) : 0;
+      const blk  = p.open_blockers ? `<span class="pc-blk">&#9888; ${p.open_blockers}</span>` : '';
+      return `<div class="project-card" onclick="selectProject('${esc(p.project_id)}')">
+        <div class="pc-header">
+          <span class="pdot ${dc}"></span>
+          <span class="pc-name">${esc(p.project_name||p.project_id)}</span>
+          <span class="pc-step">Step ${esc(p.step||'-')}/9</span>
+        </div>
+        <div class="pc-stats">
+          <span class="c-amber">${fmt(p.consumed||0)}</span> consumed &nbsp;
+          <span class="c-green">+${fmt(p.saved||0)}</span> saved<br>
+          <span class="c-muted">today +${(p.today_saved||0).toLocaleString()}</span>
+        </div>
+        <div class="pc-footer">
+          <span class="pc-eff">${eff}% eff</span>
+          ${blk}
+          <button class="pc-open" onclick="event.stopPropagation();selectProject('${esc(p.project_id)}')">Open &#8594;</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
   const alertsEl = document.getElementById('alerts');
-  if (alertsEl) alertsEl.before(panel); else document.body.appendChild(panel);
+  if (alertsEl) alertsEl.before(grid); else document.body.appendChild(grid);
 }
 
+// ── Settings ─────────────────────────────────────────────────
+function openSettings() {
+  fetch('/api/settings').then(r => r.json()).then(cfg => {
+    const mon = cfg.monitor || {};
+    const def = cfg.defaults || {};
+    document.getElementById('cfg-port').value        = mon.default_port   || 3170;
+    document.getElementById('cfg-browser').checked   = mon.auto_open_browser !== false;
+    document.getElementById('cfg-idle').checked      = cfg.show_idle_projects !== false;
+    document.getElementById('cfg-idle-min').value    = def.idle_threshold_min || 10;
+    document.getElementById('settings-overlay').classList.add('open');
+  }).catch(() => {
+    document.getElementById('settings-overlay').classList.add('open');
+  });
+}
+function closeSettings(e) {
+  if (e && e.target !== document.getElementById('settings-overlay')) return;
+  document.getElementById('settings-overlay').classList.remove('open');
+}
+function saveSettings() {
+  const cfg = {
+    monitor: {
+      default_port:      parseInt(document.getElementById('cfg-port').value)||3170,
+      auto_open_browser: document.getElementById('cfg-browser').checked,
+    },
+    show_idle_projects: document.getElementById('cfg-idle').checked,
+    defaults: {
+      idle_threshold_min: parseInt(document.getElementById('cfg-idle-min').value)||10,
+    }
+  };
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(cfg),
+  }).then(r => r.json()).then(() => {
+    document.getElementById('settings-overlay').classList.remove('open');
+  }).catch(() => {});
+}
+
+// ── SSE v2 ───────────────────────────────────────────────────
 fetchProjects();
-setInterval(fetchProjects, 5000);
+setInterval(fetchProjects, 60000);  // reduced from 5s → 60s (SSE handles real-time)
 
 let _es = null;
 
@@ -851,24 +1052,53 @@ function connectSSE() {
   _es = new EventSource('/api/stream');
   _es.onmessage = (e) => {
     if (paused) return;
-    // Only update the view from SSE when in live mode (no tab selected).
-    // When _activePid is null (All) or a project ID, the user is in a static view —
-    // don't overwrite it with single-project SSE data.
-    if (_activePid !== undefined) return;
-    try { render(JSON.parse(e.data)); setCss('ldot','opacity','1'); } catch(_) {}
+    try {
+      const msg = JSON.parse(e.data);
+      // Typed event: {type:"project_update", project_id, data}
+      if (msg.type === 'project_update') {
+        const pid  = msg.project_id;
+        const data = msg.data;
+        if (!pid) return;
+        // Keep _projects cache up to date
+        if (_projects[pid]) {
+          _projects[pid] = {..._projects[pid], ...data, sort_key: _projects[pid].sort_key};
+        }
+        // Update switcher dot (activity state may have changed)
+        renderSwitcher();
+        // Only push to main view if user is watching this project or in live mode
+        if (_activePid === undefined && (pid === _curPid || !_curPid)) {
+          render(data); setCss('ldot','opacity','1');
+        } else if (_activePid === pid) {
+          const s = (data.consumed||0) + (data.saved||0);
+          render({...data,
+            eff_pct:  s ? Math.round(data.saved/s*100) : 0,
+            budget:   12000,
+            bud_pct:  data.consumed ? Math.round(data.consumed/12000*100) : 0,
+            alerts:   data.open_blockers ? [`${data.open_blockers} open blocker(s)`] : [],
+            duration: '--:--:--', ts: new Date().toLocaleTimeString(),
+          });
+          setCss('ldot','opacity','1');
+        } else if (_activePid === null) {
+          renderProjectView(null);  // refresh All view cards
+        }
+      } else {
+        // Legacy flat payload — treat as current project update
+        if (_activePid !== undefined) return;
+        render(msg); setCss('ldot','opacity','1');
+      }
+    } catch(_) {}
   };
   _es.onerror = () => {
     setCss('ldot','opacity','.4');
-    // Auto-reconnect after 3s if connection fully closed
     setTimeout(() => { if (_es && _es.readyState === EventSource.CLOSED) connectSSE(); }, 3000);
   };
   _es.onopen = () => { setCss('ldot','opacity','1'); };
 }
 
-// Fetch initial data immediately, then connect SSE for live updates
+// Fetch initial data, set _curPid, then connect SSE
 fetch('/api/data')
   .then(r => r.json())
-  .then(d => { render(d); connectSSE(); })
+  .then(d => { _curPid = d.project_id || ''; render(d); connectSSE(); })
   .catch(() => connectSSE());
 </script>
 </body></html>
@@ -918,8 +1148,10 @@ class MonitorHandler(BaseHTTPRequestHandler):
 
         q = BROADCASTER.subscribe()
         try:
-            # Send current state immediately on connect
-            self.wfile.write(f"data: {json.dumps(build_api_data())}\n\n".encode())
+            # Send current project state immediately on connect (typed event)
+            cur = build_api_data()
+            init_msg = {"type": "project_update", "project_id": cur.get("project_id",""), "data": cur}
+            self.wfile.write(f"data: {json.dumps(init_msg)}\n\n".encode())
             self.wfile.flush()
             while True:
                 try:
@@ -927,13 +1159,40 @@ class MonitorHandler(BaseHTTPRequestHandler):
                     self.wfile.write(msg.encode())
                     self.wfile.flush()
                 except _queue.Empty:
-                    # Keepalive ping every 25s to prevent proxy timeouts
                     self.wfile.write(b": ping\n\n")
                     self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError, OSError):
             pass
         finally:
             BROADCASTER.unsubscribe(q)
+
+    def do_POST(self):
+        path = urlparse(self.path).path
+        if path == "/api/settings":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body   = self.rfile.read(length)
+                new_cfg = json.loads(body)
+                cfg_path = FLOWCTL_HOME / "config.json"
+                cfg_path.parent.mkdir(parents=True, exist_ok=True)
+                # Merge with existing (don't wipe unknown keys)
+                existing = {}
+                try:
+                    existing = json.loads(cfg_path.read_text()) if cfg_path.exists() else {}
+                except Exception:
+                    pass
+                def deep_merge(base: dict, patch: dict) -> dict:
+                    out = dict(base)
+                    for k, v in patch.items():
+                        out[k] = deep_merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+                    return out
+                merged = deep_merge(existing, new_cfg)
+                cfg_path.write_text(json.dumps(merged, indent=2))
+                self._send(json.dumps({"ok": True}).encode(), "application/json")
+            except Exception as e:
+                self._send(json.dumps({"error": str(e)}).encode(), "application/json", 400)
+        else:
+            self._send(b'{"error":"not found"}', "application/json", 404)
 
     def do_GET(self):
         path = urlparse(self.path).path
@@ -945,6 +1204,7 @@ class MonitorHandler(BaseHTTPRequestHandler):
             self._sse_stream()
         elif path == "/api/projects":
             projects = discover_projects()
+            now_ts   = datetime.now(timezone.utc).timestamp()
             result   = {}
             for pid, proj in projects.items():
                 cache_dir = proj.get("cache_dir")
@@ -957,18 +1217,38 @@ class MonitorHandler(BaseHTTPRequestHandler):
                     }
                     continue
                 try:
-                    result[pid] = build_project_data(
+                    pdata = build_project_data(
                         cache_dir,
                         str(Path(proj_path) / "flowctl-state.json")
                     )
-                    result[pid]["active"] = proj.get("active", False)
+                    pdata["active"] = proj.get("active", False)
+                    # active_seconds_ago: seconds since last event file change
+                    try:
+                        ef = Path(cache_dir) / "events.jsonl"
+                        age = int(now_ts - _os.stat(str(ef)).st_mtime) if ef.exists() else 999999
+                    except Exception:
+                        age = 999999
+                    pdata["active_seconds_ago"] = age
+                    # sort_key: active projects first (age < 600), then by age asc
+                    pdata["sort_key"] = (0 if age < 600 else 1, age)
+                    result[pid] = pdata
                 except Exception as e:
                     result[pid] = {
                         "project_id":   pid,
                         "project_name": proj.get("project_name", "?"),
+                        "active":       proj.get("active", False),
+                        "active_seconds_ago": 999999,
+                        "sort_key":     (2, 999999),
                         "error":        str(e),
                     }
             self._send(json.dumps({"projects": result}).encode(), "application/json")
+        elif path == "/api/settings":
+            cfg_path = FLOWCTL_HOME / "config.json"
+            try:
+                cfg = json.loads(cfg_path.read_text()) if cfg_path.exists() else {}
+            except Exception:
+                cfg = {}
+            self._send(json.dumps(cfg).encode(), "application/json")
         elif path == "/api/health":
             self._send(b'{"ok":true}', "application/json")
         else:
@@ -1008,17 +1288,39 @@ def main():
     signal.signal(signal.SIGINT,  _stop)
     signal.signal(signal.SIGTERM, _stop)
 
-    # Start file watcher for SSE push
-    watch_paths = [str(p) for p in [EVENTS_F, STATS_F] if p.exists()]
-    if not watch_paths:
-        watch_paths = [str(EVENTS_F)]  # watch even if not yet created
-    # In global mode: also watch all known project events files in home dir
-    if GLOBAL_MODE and (FLOWCTL_HOME / "projects").exists():
+    # Build FileWatcher paths_map: {filepath: meta | None}
+    # None = current project (uses build_api_data + STATE_F for project_id)
+    # dict = {project_id, cache_dir, state_path} for non-current projects
+    try:
+        cur_pid = load_flow_state().get("flow_id", "")
+    except Exception:
+        cur_pid = ""
+
+    watch_map: dict = {}
+    # Current project — always watch even if file doesn't exist yet
+    for p in [EVENTS_F, STATS_F]:
+        watch_map[str(p)] = None
+
+    # Other projects from ~/.flowctl/projects/
+    if (FLOWCTL_HOME / "projects").exists():
         for entry in (FLOWCTL_HOME / "projects").iterdir():
-            ef = entry / "cache" / "events.jsonl"
-            if ef.exists() and str(ef) not in watch_paths:
-                watch_paths.append(str(ef))
-    FileWatcher(watch_paths).start()
+            meta_f = entry / "meta.json"
+            if not meta_f.exists():
+                continue
+            try:
+                meta = json.loads(meta_f.read_text())
+                pid  = meta.get("project_id", "")
+                if not pid or pid == cur_pid:
+                    continue
+                cdir  = meta.get("cache_dir", str(entry / "cache"))
+                spath = str(Path(meta.get("path", "")) / "flowctl-state.json")
+                ef    = Path(cdir) / "events.jsonl"
+                if ef.exists():
+                    watch_map[str(ef)] = {"project_id": pid, "cache_dir": cdir, "state_path": spath}
+            except Exception:
+                pass
+
+    FileWatcher(watch_map).start()
 
     print(f"[flowctl monitor] Dashboard: {url}")
     print("[flowctl monitor] Ctrl+C to stop")
