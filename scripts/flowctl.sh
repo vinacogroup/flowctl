@@ -40,6 +40,13 @@ WORKFLOW_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_ROOT="${PROJECT_ROOT:-$PWD}"
 WORKFLOW_CLI_CMD="${WORKFLOW_CLI_CMD:-flowctl}"
 
+# Windows (Git Bash / MSYS2): convert MSYS paths (/c/Users/...) to mixed format
+# (C:/Users/...) so Python's open() can resolve them correctly.
+if command -v cygpath &>/dev/null 2>&1; then
+  WORKFLOW_ROOT="$(cygpath -m "$WORKFLOW_ROOT")"
+  PROJECT_ROOT="$(cygpath -m "$PROJECT_ROOT")"
+fi
+
 # ── Library modules ───────────────────────────────────────────
 LIB_DIR="$WORKFLOW_ROOT/scripts/workflow/lib"
 # shellcheck source=/dev/null

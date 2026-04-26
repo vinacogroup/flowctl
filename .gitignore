@@ -23,3 +23,6 @@ graphify-out/cache/
 graphify-out/memory/
 !graphify-out/graph.json
 flowctl-state.json
+plan.md
+brainstorm-v2.md
+brainstorm.md

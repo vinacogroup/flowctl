@@ -40,7 +40,10 @@ WORKFLOW_LOCK_DIR="$REPO_ROOT/.flowctl-lock"
 # workflows/policies/ stays in the repo (version-controlled config).
 # ─────────────────────────────────────────────────────────────
 
-FLOWCTL_HOME="${FLOWCTL_HOME:-$HOME/.flowctl}"
+# Windows: $HOME is a MSYS path (/c/Users/...) — convert to mixed format for Python compat.
+_home_native="$HOME"
+command -v cygpath &>/dev/null 2>&1 && _home_native="$(cygpath -m "$HOME")"
+FLOWCTL_HOME="${FLOWCTL_HOME:-$_home_native/.flowctl}"
 
 # Fast bash-only parse of flow_id + project_name from state file (no python overhead).
 _fl_id=""
