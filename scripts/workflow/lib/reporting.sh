@@ -5,7 +5,11 @@ cmd_summary() {
   step=$(wf_json_get "current_step")
 
   python3 -c "
-import json
+import json, sys
+
+# Windows cp1252 fix: reconfigure stdout to UTF-8
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 with open('$STATE_FILE') as f:
     data = json.load(f)
@@ -46,7 +50,10 @@ print()
 
 cmd_history() {
   python3 -c "
-import json
+import json, sys
+
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 with open('$STATE_FILE') as f:
     data = json.load(f)
@@ -163,7 +170,21 @@ lines.append(f"- gate_detail: {gate_detail}")
 lines.append(f"- blockers_open: {len(open_blockers)}")
 lines.append("")
 lines.append("## Evidence Integrity")
-lines.append(f"- evidence_manifest: {manifest_path.relative_to(repo_root) if manifest_path.exists() else 'missing'}")
+if manifest_path.exists():
+    # relative_to() raises ValueError when manifest lives outside REPO_ROOT
+    # (e.g. ~/.flowctl/…/evidence/ on Windows).  Fall back to os.path.relpath()
+    # which always succeeds, then use the absolute path as a last resort.
+    try:
+        _manifest_display = str(manifest_path.relative_to(repo_root))
+    except ValueError:
+        import os as _os
+        try:
+            _manifest_display = _os.path.relpath(str(manifest_path), str(repo_root))
+        except ValueError:
+            _manifest_display = str(manifest_path)
+else:
+    _manifest_display = "missing"
+lines.append(f"- evidence_manifest: {_manifest_display}")
 lines.append(f"- evidence_files: {manifest.get('file_count', 0)}")
 lines.append(f"- evidence_signature: {manifest.get('signature', 'missing')}")
 lines.append("")

@@ -86,6 +86,11 @@ source "$LIB_DIR/reporting.sh"
 export FLOWCTL_HOME FLOWCTL_DATA_DIR FLOWCTL_CACHE_DIR FLOWCTL_RUNTIME_DIR \
        FLOWCTL_EVENTS_F FLOWCTL_STATS_F
 
+# ── Windows Unicode fix: force Python subprocesses to use UTF-8 I/O ──
+# Without this, Python on Windows defaults to cp1252 and crashes on ✓ → ✗ ○
+export PYTHONUTF8=1
+export PYTHONIOENCODING=utf-8
+
 # ── Commands ─────────────────────────────────────────────────
 
 # Copy files from $1 into $2, skipping files that already exist (unless overwrite=true).
@@ -449,6 +454,10 @@ cmd_status_all() {
 import json, sys
 from datetime import datetime, timezone
 
+# Windows cp1252 fix
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
 reg      = json.loads(open(sys.argv[1]).read())
 projects = sorted(reg.get("projects", {}).values(),
                   key=lambda p: p.get("last_seen",""), reverse=True)
@@ -502,7 +511,11 @@ cmd_status() {
 
   # In tất cả steps
   python3 -c "
-import json
+import json, sys
+
+# Windows cp1252 fix: reconfigure stdout to UTF-8 so ✓ → ✗ ○ render correctly
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 with open('$STATE_FILE') as f:
     data = json.load(f)

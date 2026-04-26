@@ -59,14 +59,22 @@ wf_evaluate_gate() {
       return 1
     fi
   fi
-  python3 - <<PY
-import json
+  # Windows Git Bash fix: unquoted <<PY heredoc inside $() causes the bash parser
+  # to mis-tokenise Python's "for … in …:" as a bash keyword.  Use <<'PY' (quoted,
+  # no variable expansion) and pass values through environment variables instead.
+  WF_STATE_FILE="$STATE_FILE" WF_GATE_FILE="$QA_GATE_FILE" \
+  WF_REPO_ROOT="$REPO_ROOT" WF_STEP="$step" python3 - <<'PY'
+import json, os, sys
 from pathlib import Path
 
-state_path = Path("$STATE_FILE")
-gate_path = Path("$QA_GATE_FILE")
-repo_root = Path("$REPO_ROOT")
-step = str($step)
+# Windows cp1252 fix
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
+state_path = Path(os.environ["WF_STATE_FILE"])
+gate_path  = Path(os.environ["WF_GATE_FILE"])
+repo_root  = Path(os.environ["WF_REPO_ROOT"])
+step       = os.environ["WF_STEP"]
 
 if not state_path.exists():
     print("GATE_FAIL|flowctl-state.json not found")
